@@ -451,7 +451,7 @@ export interface ApiFixtureFixture extends Struct.SingleTypeSchema {
       'api::fixture.fixture'
     > &
       Schema.Attribute.Private;
-    meetings: Schema.Attribute.JSON & Schema.Attribute.Required;
+    meetings: Schema.Attribute.Component<'fixture.meeting-slot', true>;
     publishedAt: Schema.Attribute.DateTime;
     season: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;

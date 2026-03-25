@@ -19,8 +19,9 @@
       "type": "datetime"
     },
     "meetings": {
-      "type": "json",
-      "required": true
+      "type": "component",
+      "repeatable": true,
+      "component": "fixture.meeting-slot"
     }
   }
 }
