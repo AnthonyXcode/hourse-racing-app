@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "histories",
+  "info": {
+    "singularName": "history",
+    "pluralName": "histories",
+    "displayName": "History"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "meeting": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::meeting.meeting",
+      "inversedBy": "histories",
+      "required": true
+    },
+    "results": {
+      "type": "json",
+      "required": true
+    },
+    "scrapedAt": {
+      "type": "datetime"
+    },
+    "source": {
+      "type": "string",
+      "default": "hkjc"
+    }
+  }
+}

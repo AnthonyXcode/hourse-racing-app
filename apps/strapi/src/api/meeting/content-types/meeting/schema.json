@@ -1,0 +1,43 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meetings",
+  "info": {
+    "singularName": "meeting",
+    "pluralName": "meetings",
+    "displayName": "Meeting"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "raceDate": {
+      "type": "date",
+      "required": true
+    },
+    "venue": {
+      "type": "enumeration",
+      "enum": ["ST", "HV"],
+      "required": true
+    },
+    "scrapeStatus": {
+      "type": "enumeration",
+      "enum": ["not_started", "pending", "success", "failed", "partial"],
+      "default": "not_started"
+    },
+    "lastScrapedAt": {
+      "type": "datetime"
+    },
+    "histories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::history.history",
+      "mappedBy": "meeting"
+    }
+  }
+}

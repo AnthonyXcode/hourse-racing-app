@@ -1,0 +1,26 @@
+{
+  "kind": "singleType",
+  "collectionName": "fixture",
+  "info": {
+    "singularName": "fixture",
+    "pluralName": "fixtures",
+    "displayName": "Fixture"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "season": {
+      "type": "string",
+      "required": true
+    },
+    "lastUpdated": {
+      "type": "datetime"
+    },
+    "meetings": {
+      "type": "json",
+      "required": true
+    }
+  }
+}

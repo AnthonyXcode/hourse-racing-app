@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "healthchecks",
+  "info": {
+    "singularName": "healthcheck",
+    "pluralName": "healthchecks",
+    "displayName": "Healthcheck"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "jobName": {
+      "type": "string",
+      "required": true,
+      "default": "daily_hkjc_sync"
+    },
+    "startedAt": {
+      "type": "datetime"
+    },
+    "completedAt": {
+      "type": "datetime"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "running", "success", "partial", "failure"],
+      "default": "pending",
+      "required": true
+    },
+    "summary": {
+      "type": "text"
+    },
+    "metrics": {
+      "type": "json"
+    }
+  }
+}
