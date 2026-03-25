@@ -1,6 +1,6 @@
 {
-  "kind": "singleType",
-  "collectionName": "fixture",
+  "kind": "collectionType",
+  "collectionName": "fixtures",
   "info": {
     "singularName": "fixture",
     "pluralName": "fixtures",
@@ -11,17 +11,19 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "season": {
+    "key": {
       "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "raceDate": {
+      "type": "date",
       "required": true
     },
-    "lastUpdated": {
-      "type": "datetime"
-    },
-    "meetings": {
-      "type": "component",
-      "repeatable": true,
-      "component": "fixture.meeting-slot"
+    "venue": {
+      "type": "enumeration",
+      "enum": ["ST", "HV"],
+      "required": true
     }
   }
 }

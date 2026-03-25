@@ -430,8 +430,8 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiFixtureFixture extends Struct.SingleTypeSchema {
-  collectionName: 'fixture';
+export interface ApiFixtureFixture extends Struct.CollectionTypeSchema {
+  collectionName: 'fixtures';
   info: {
     displayName: 'Fixture';
     pluralName: 'fixtures';
@@ -444,19 +444,22 @@ export interface ApiFixtureFixture extends Struct.SingleTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    lastUpdated: Schema.Attribute.DateTime;
+    key: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::fixture.fixture'
     > &
       Schema.Attribute.Private;
-    meetings: Schema.Attribute.Component<'fixture.meeting-slot', true>;
     publishedAt: Schema.Attribute.DateTime;
-    season: Schema.Attribute.String & Schema.Attribute.Required;
+    raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
+      Schema.Attribute.Required;
   };
 }
 

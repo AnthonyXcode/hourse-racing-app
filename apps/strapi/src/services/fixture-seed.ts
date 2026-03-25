@@ -2,7 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 type DiskMeeting = { date: string; venue: string };
-type FixtureFile = { lastUpdated?: string; season?: string; meetings?: DiskMeeting[] };
+/** Seed file may still include legacy `season` / `lastUpdated`; they are ignored. */
+type FixtureFile = { meetings?: DiskMeeting[] };
 
 function seedFilePath(): string {
   const override = process.env.HKJC_FIXTURE_SEED_FILE;
@@ -10,8 +11,12 @@ function seedFilePath(): string {
   return path.resolve(process.cwd(), 'data', 'fixtures.seed.json');
 }
 
+function slotKey(date: string, venue: string): string {
+  return `${date}_${venue}`;
+}
+
 /**
- * Optional bootstrap: upsert Fixture from `apps/strapi/data/fixtures.seed.json`
+ * Optional bootstrap: create missing Fixture collection rows from `data/fixtures.seed.json`
  * (or `HKJC_FIXTURE_SEED_FILE`). Does not read or write any other app in the monorepo.
  */
 export async function seedFixtureFromSeedFile(strapi: any): Promise<void> {
@@ -44,34 +49,33 @@ export async function seedFixtureFromSeedFile(strapi: any): Promise<void> {
     return;
   }
 
-  const meetings = rows.map((m) => ({
-    raceDate: m.date,
-    venue: m.venue as 'ST' | 'HV',
-  }));
-
-  const payload = {
-    season: file.season || '2025-2026',
-    lastUpdated: file.lastUpdated || new Date().toISOString(),
-    meetings,
-  };
-
   if (process.env.HKJC_FIXTURE_SYNC_ON_BOOT === 'false') {
     strapi.log.info('fixture-seed: skipped (HKJC_FIXTURE_SYNC_ON_BOOT=false)');
     return;
   }
 
-  const existing = await documents('api::fixture.fixture').findFirst({
-    populate: ['meetings'],
-  });
-
-  if (existing?.documentId) {
-    await documents('api::fixture.fixture').update({
-      documentId: existing.documentId,
-      data: payload,
+  let created = 0;
+  let skipped = 0;
+  for (const m of rows) {
+    const key = slotKey(m.date, m.venue);
+    const found = await documents('api::fixture.fixture').findFirst({
+      filters: { key: { $eq: key } },
     });
-    strapi.log.info(`fixture-seed: updated Fixture with ${meetings.length} meeting slots`);
-  } else {
-    await documents('api::fixture.fixture').create({ data: payload });
-    strapi.log.info(`fixture-seed: created Fixture with ${meetings.length} meeting slots`);
+    if (found) {
+      skipped++;
+      continue;
+    }
+    await documents('api::fixture.fixture').create({
+      data: {
+        key,
+        raceDate: m.date,
+        venue: m.venue as 'ST' | 'HV',
+      },
+    });
+    created++;
   }
+
+  strapi.log.info(
+    `fixture-seed: fixture rows created=${created}, already present=${skipped} (from ${rows.length} seed entries)`
+  );
 }

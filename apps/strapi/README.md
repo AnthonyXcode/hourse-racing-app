@@ -56,7 +56,7 @@ Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/
 
 | When | What runs |
 |------|-----------|
-| **App bootstrap** | Optional **Fixture** upsert from `data/fixtures.seed.json` via `seedFixtureFromSeedFile` (skipped if `HKJC_FIXTURE_SYNC_ON_BOOT=false`). |
+| **App bootstrap** | Optional **Fixture** row creation from `data/fixtures.seed.json` via `seedFixtureFromSeedFile` (skipped if `HKJC_FIXTURE_SYNC_ON_BOOT=false`). |
 | **Cron** | `runHkjcSyncOnce` → `runHkjcDailyJob` on `HKJC_CRON_SCHEDULE` (disabled if `HKJC_CRON_ENABLED=false`). |
 | **After listen (optional)** | Same sync job if `HKJC_CRON_RUN_ON_BOOT=true`. |
 | **HTTP** | `POST /api/hkjc-sync/trigger` with `x-hkjc-sync-secret` (when `HKJC_SYNC_TRIGGER_SECRET` is set). |
@@ -94,9 +94,9 @@ sequenceDiagram
   alt fixture fetch enabled and succeeds
     Job->>Web: Playwright fixture scrape
     Web-->>Job: meeting rows
-    Job->>Fx: upsert season, lastUpdated, meeting slots
+    Job->>Fx: create missing Fixture rows (key, raceDate, venue)
   else no fetch or empty result
-    Job->>Fx: read existing single-type Fixture (fallback list)
+    Job->>Fx: read Fixture collection (fallback list)
   end
 
   loop each date or venue slot in resolved list
@@ -104,7 +104,7 @@ sequenceDiagram
   end
 
   opt historical sync enabled
-    Note over Job, Hi: Past dates only; # capped by HKJC_HISTORICAL_MAX_PER_RUN
+    Note over Job, Hi: Past dates only; capped by HKJC_HISTORICAL_MAX_PER_RUN
     loop missing past Meeting with no History
       Job->>Web: scrape local results (Playwright)
       Job->>Hi: create linked History plus results components

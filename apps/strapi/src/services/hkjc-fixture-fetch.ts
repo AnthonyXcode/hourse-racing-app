@@ -9,14 +9,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** HK season label e.g. 2025-2026 (Sep–Aug). */
-export function inferHkjcSeason(ref: Date = new Date()): string {
-  const y = ref.getFullYear();
-  const m = ref.getMonth() + 1;
-  if (m >= 9) return `${y}-${y + 1}`;
-  return `${y - 1}-${y}`;
-}
-
 type FetchOptions = {
   daysAhead: number;
   headless: boolean;
@@ -30,10 +22,11 @@ type FetchOptions = {
 };
 
 export type FetchedFixture = {
-  season: string;
-  lastUpdated: string;
+  /** All slots: existing plus newly discovered (sorted). */
   meetings: { date: string; venue: 'ST' | 'HV' }[];
-  /** New slots found in this run (not present in `existingMeetings` passed in). */
+  /** New slots found on HKJC this run (subset of `meetings`). */
+  discoveredThisRun: { date: string; venue: 'ST' | 'HV' }[];
+  /** Count of new slots (same as `discoveredThisRun.length`). */
   newlyDiscoveredCount: number;
   /** Calendar days visited on HKJC in this run. */
   scannedDayCount: number;
@@ -158,7 +151,6 @@ export class HkjcFixtureFetcher {
       const rcUrl = `${this.baseUrl}/en-us/local/information/racecard?raceDate=${dateStr}&Racecourse=${code}&RaceNo=1`;
       await this.navigateTo(rcUrl);
       content = await this.page.content();
-      console.log('content', content);
       if (this.countHorseEntryRows(content) >= 1) {
         out.push({ venue: code });
       }
@@ -221,9 +213,8 @@ export async function fetchHkjcFixtures(options: FetchOptions): Promise<FetchedF
   const { merged, newlyDiscoveredCount } = mergeFixtureMeetings(existing, discovered);
 
   return {
-    season: inferHkjcSeason(new Date()),
-    lastUpdated: new Date().toISOString(),
     meetings: merged,
+    discoveredThisRun: discovered,
     newlyDiscoveredCount,
     scannedDayCount,
   };

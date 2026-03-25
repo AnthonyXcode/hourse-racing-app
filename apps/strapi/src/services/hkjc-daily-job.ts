@@ -2,7 +2,6 @@ import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
 import { syncMissingMeetingHistories } from './hkjc-historical-sync';
 
 type MeetingRow = { date: string; venue: 'ST' | 'HV' };
-type FixtureStore = { season: string; lastUpdated: string; meetings: MeetingRow[] };
 
 function meetingKey(date: string, venue: string): string {
   return `${date}_${venue}`;
@@ -15,24 +14,45 @@ function normalizeRaceDate(value: unknown): string {
   return '';
 }
 
-function meetingsToComponents(meetings: MeetingRow[]): { raceDate: string; venue: 'ST' | 'HV' }[] {
-  return meetings.map((m) => ({ raceDate: m.date, venue: m.venue }));
+/** Load all Fixture collection rows as meeting slots (paged). */
+async function loadAllFixtureMeetings(documents: any): Promise<MeetingRow[]> {
+  const pageSize = 500;
+  const all: MeetingRow[] = [];
+  let page = 1;
+  for (;;) {
+    const batch = await documents('api::fixture.fixture').findMany({
+      pagination: { page, pageSize },
+      sort: ['raceDate:asc', 'venue:asc'],
+    });
+    const rows = Array.isArray(batch) ? batch : [];
+    for (const r of rows) {
+      const row = r as { raceDate?: unknown; venue?: unknown };
+      const date = normalizeRaceDate(row.raceDate);
+      const venue = row.venue === 'ST' || row.venue === 'HV' ? row.venue : null;
+      if (date && venue) all.push({ date, venue });
+    }
+    if (rows.length < pageSize) break;
+    page += 1;
+    if (page > 500) break;
+  }
+  return all;
 }
 
-async function upsertStrapiFixture(documents: any, store: FixtureStore): Promise<void> {
-  const fixtureRow = await documents('api::fixture.fixture').findFirst({});
-  const fixturePayload = {
-    season: store.season,
-    lastUpdated: store.lastUpdated || new Date().toISOString(),
-    meetings: meetingsToComponents(store.meetings),
-  };
-  if (fixtureRow?.documentId) {
-    await documents('api::fixture.fixture').update({
-      documentId: fixtureRow.documentId,
-      data: fixturePayload,
+/** Persist new HKJC slots as Fixture documents (idempotent by `key`). */
+async function createFixtureRowsIfMissing(documents: any, slots: MeetingRow[]): Promise<void> {
+  for (const m of slots) {
+    const key = meetingKey(m.date, m.venue);
+    const found = await documents('api::fixture.fixture').findFirst({
+      filters: { key: { $eq: key } },
     });
-  } else {
-    await documents('api::fixture.fixture').create({ data: fixturePayload });
+    if (found) continue;
+    await documents('api::fixture.fixture').create({
+      data: {
+        key,
+        raceDate: m.date,
+        venue: m.venue,
+      },
+    });
   }
 }
 
@@ -71,25 +91,8 @@ function metricsPayload(
   return out;
 }
 
-/** Map Fixture.meetings components to MeetingRow[] */
-function meetingsFromFixtureData(rows: unknown): MeetingRow[] {
-  if (!Array.isArray(rows)) return [];
-  const out: MeetingRow[] = [];
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue;
-    const r = row as Record<string, unknown>;
-    const dateRaw = r.raceDate ?? r.date;
-    const venueRaw = r.venue;
-    const date = normalizeRaceDate(dateRaw);
-    const venue = venueRaw === 'ST' || venueRaw === 'HV' ? venueRaw : null;
-    if (date && venue) out.push({ date, venue });
-  }
-  return out;
-}
-
 /**
- * Daily job: fetch upcoming fixtures from HKJC (Playwright, same approach as reference
- * `RaceCardScraper.getRaceMeetings`), upsert Fixture, then ensure Meeting entries exist.
+ * Daily job: fetch upcoming fixtures from HKJC (Playwright), add Fixture rows, then ensure Meeting entries exist.
  */
 export async function runHkjcDailyJob(strapi: any): Promise<void> {
   const documents = strapi.documents;
@@ -143,10 +146,7 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
       );
       const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
       try {
-        const fixtureRowForFetch = await documents('api::fixture.fixture').findFirst({
-          populate: ['meetings'],
-        });
-        const existingSlots = meetingsFromFixtureData(fixtureRowForFetch?.meetings);
+        const existingSlots = await loadAllFixtureMeetings(documents);
         strapi.log.info(
           `hkjc-daily-job: fetching HKJC fixtures (${daysAhead} days ahead, ${existingSlots.length} existing slots, headless=${headless})`
         );
@@ -159,12 +159,8 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         });
         meetings = fetched.meetings;
         hkjcMeetingsFetched = fetched.newlyDiscoveredCount;
-        if (fetched.scannedDayCount > 0 && fetched.meetings.length > 0) {
-          await upsertStrapiFixture(documents, {
-            season: fetched.season,
-            lastUpdated: fetched.lastUpdated,
-            meetings: fetched.meetings,
-          });
+        if (fetched.scannedDayCount > 0 && fetched.discoveredThisRun.length > 0) {
+          await createFixtureRowsIfMissing(documents, fetched.discoveredThisRun);
         }
         if (fetched.meetings.length > 0) {
           const detailParts = [
@@ -198,15 +194,12 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
     }
 
     if (meetings.length === 0) {
-      const fixtureRow = await documents('api::fixture.fixture').findFirst({
-        populate: ['meetings'],
-      });
-      meetings = meetingsFromFixtureData(fixtureRow?.meetings);
+      meetings = await loadAllFixtureMeetings(documents);
       if (meetings.length > 0) {
         phases.push({
           name: 'fixtures_fallback',
           status: 'success',
-          detail: `Using ${meetings.length} meetings already in Strapi Fixture`,
+          detail: `Using ${meetings.length} meetings from Fixture collection`,
         });
       }
     }
@@ -221,7 +214,7 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
       phases.push({
         name: 'fixtures',
         status: 'skipped',
-        detail: 'No meetings (HKJC fetch empty and Fixture empty)',
+        detail: 'No meetings (HKJC fetch empty and Fixture collection empty)',
       });
     }
 
