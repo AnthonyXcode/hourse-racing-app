@@ -1,0 +1,26 @@
+{
+  "name": "hourse-racing-app",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:mobile": "turbo run dev --filter=mobile",
+    "dev:api": "turbo run dev --filter=api"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@strapi/core": {
+        "dependencies": {
+          "bcryptjs": "2.4.3"
+        }
+      }
+    }
+  }
+}
