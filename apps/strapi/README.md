@@ -104,7 +104,7 @@ sequenceDiagram
   end
 
   opt historical sync enabled
-    Note over Job, Hi: Past dates only; capped by HKJC_HISTORICAL_MAX_PER_RUN
+    Note over Job, Hi: Past dates only; # capped by HKJC_HISTORICAL_MAX_PER_RUN
     loop missing past Meeting with no History
       Job->>Web: scrape local results (Playwright)
       Job->>Hi: create linked History plus results components

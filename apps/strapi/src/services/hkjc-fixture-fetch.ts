@@ -1,6 +1,6 @@
 import { chromium, type Browser, type Page } from 'playwright';
 import * as cheerio from 'cheerio';
-import { addDays, format, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay, parse, isAfter } from 'date-fns';
 
 const DEFAULT_BASE = 'https://racing.hkjc.com';
 const DEFAULT_RATE_LIMIT_PER_MIN = 20;
@@ -22,13 +22,51 @@ type FetchOptions = {
   headless: boolean;
   baseUrl?: string;
   rateLimitPerMinute?: number;
+  /**
+   * Current fixture meeting slots. HKJC is queried only for calendar days strictly after the
+   * latest `date` here, starting no earlier than today, through `today + daysAhead` (inclusive).
+   */
+  existingMeetings?: { date: string; venue: 'ST' | 'HV' }[];
 };
 
 export type FetchedFixture = {
   season: string;
   lastUpdated: string;
   meetings: { date: string; venue: 'ST' | 'HV' }[];
+  /** New slots found in this run (not present in `existingMeetings` passed in). */
+  newlyDiscoveredCount: number;
+  /** Calendar days visited on HKJC in this run. */
+  scannedDayCount: number;
 };
+
+function maxFixtureDateIso(rows: { date: string }[]): string | null {
+  let max: string | null = null;
+  for (const r of rows) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) continue;
+    if (!max || r.date > max) max = r.date;
+  }
+  return max;
+}
+
+function mergeFixtureMeetings(
+  existing: { date: string; venue: 'ST' | 'HV' }[],
+  discovered: { date: string; venue: 'ST' | 'HV' }[]
+): { merged: { date: string; venue: 'ST' | 'HV' }[]; newlyDiscoveredCount: number } {
+  const keys = new Set<string>();
+  for (const m of existing) keys.add(`${m.date}_${m.venue}`);
+  const merged = [...existing];
+  let newlyDiscoveredCount = 0;
+  for (const m of discovered) {
+    const k = `${m.date}_${m.venue}`;
+    if (!keys.has(k)) {
+      keys.add(k);
+      merged.push(m);
+      newlyDiscoveredCount++;
+    }
+  }
+  merged.sort((a, b) => a.date.localeCompare(b.date) || a.venue.localeCompare(b.venue));
+  return { merged, newlyDiscoveredCount };
+}
 
 /**
  * Discover Sha Tin / Happy Valley meetings by scanning HKJC pages (same idea as reference
@@ -120,6 +158,7 @@ export class HkjcFixtureFetcher {
       const rcUrl = `${this.baseUrl}/en-us/local/information/racecard?raceDate=${dateStr}&Racecourse=${code}&RaceNo=1`;
       await this.navigateTo(rcUrl);
       content = await this.page.content();
+      console.log('content', content);
       if (this.countHorseEntryRows(content) >= 1) {
         out.push({ venue: code });
       }
@@ -129,44 +168,63 @@ export class HkjcFixtureFetcher {
 }
 
 /**
- * Scan HKJC for race days in [today, today + daysAhead].
+ * Scan HKJC for race days from the first calendar day after the latest stored fixture date
+ * (but not before today) through `today + daysAhead` inclusive, then merge with `existingMeetings`.
+ * First run (no existing rows) scans [today, today + daysAhead] as before.
  */
 export async function fetchHkjcFixtures(options: FetchOptions): Promise<FetchedFixture> {
+  const existing = options.existingMeetings ?? [];
+  const today = startOfDay(new Date());
+  const windowEnd = startOfDay(addDays(today, options.daysAhead));
+
+  let scanStart = today;
+  const maxIso = maxFixtureDateIso(existing);
+  if (maxIso) {
+    const maxDay = startOfDay(parse(maxIso, 'yyyy-MM-dd', new Date()));
+    const dayAfterLast = addDays(maxDay, 1);
+    scanStart = isAfter(dayAfterLast, today) ? dayAfterLast : today;
+  }
+
   const fetcher = new HkjcFixtureFetcher({
     headless: options.headless,
     baseUrl: options.baseUrl,
     rateLimitPerMinute: options.rateLimitPerMinute,
   });
   await fetcher.init();
-  const meetings: { date: string; venue: 'ST' | 'HV' }[] = [];
-  const keys = new Set<string>();
+  const discovered: { date: string; venue: 'ST' | 'HV' }[] = [];
+  const seenInScan = new Set<string>();
+  let scannedDayCount = 0;
+
   try {
-    const start = startOfDay(new Date());
-    for (let i = 0; i <= options.daysAhead; i++) {
-      const d = addDays(start, i);
-      try {
-        const dayMeetings = await fetcher.getMeetingsForDate(d);
-        const ds = format(d, 'yyyy-MM-dd');
-        for (const m of dayMeetings) {
-          const k = `${ds}_${m.venue}`;
-          if (!keys.has(k)) {
-            keys.add(k);
-            meetings.push({ date: ds, venue: m.venue });
+    if (!isAfter(scanStart, windowEnd)) {
+      for (let d = scanStart; !isAfter(d, windowEnd); d = addDays(d, 1)) {
+        scannedDayCount++;
+        try {
+          const dayMeetings = await fetcher.getMeetingsForDate(d);
+          const ds = format(d, 'yyyy-MM-dd');
+          for (const m of dayMeetings) {
+            const k = `${ds}_${m.venue}`;
+            if (!seenInScan.has(k)) {
+              seenInScan.add(k);
+              discovered.push({ date: ds, venue: m.venue });
+            }
           }
+        } catch {
+          // No meeting or transient error for this date
         }
-      } catch {
-        // No meeting or transient error for this date
       }
     }
   } finally {
     await fetcher.close();
   }
 
-  meetings.sort((a, b) => a.date.localeCompare(b.date) || a.venue.localeCompare(b.venue));
+  const { merged, newlyDiscoveredCount } = mergeFixtureMeetings(existing, discovered);
 
   return {
     season: inferHkjcSeason(new Date()),
     lastUpdated: new Date().toISOString(),
-    meetings,
+    meetings: merged,
+    newlyDiscoveredCount,
+    scannedDayCount,
   };
 }

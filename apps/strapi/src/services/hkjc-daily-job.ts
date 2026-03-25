@@ -143,24 +143,40 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
       );
       const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
       try {
+        const fixtureRowForFetch = await documents('api::fixture.fixture').findFirst({
+          populate: ['meetings'],
+        });
+        const existingSlots = meetingsFromFixtureData(fixtureRowForFetch?.meetings);
         strapi.log.info(
-          `hkjc-daily-job: fetching HKJC fixtures (${daysAhead} days ahead, headless=${headless})`
+          `hkjc-daily-job: fetching HKJC fixtures (${daysAhead} days ahead, ${existingSlots.length} existing slots, headless=${headless})`
         );
         const fetched = await fetchHkjcFixtures({
           daysAhead,
           headless,
           baseUrl: process.env.HKJC_BASE_URL,
           rateLimitPerMinute: Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20),
+          existingMeetings: existingSlots,
         });
+        meetings = fetched.meetings;
+        hkjcMeetingsFetched = fetched.newlyDiscoveredCount;
+        if (fetched.scannedDayCount > 0 && fetched.meetings.length > 0) {
+          await upsertStrapiFixture(documents, {
+            season: fetched.season,
+            lastUpdated: fetched.lastUpdated,
+            meetings: fetched.meetings,
+          });
+        }
         if (fetched.meetings.length > 0) {
-          await upsertStrapiFixture(documents, fetched);
-          meetings = fetched.meetings;
+          const detailParts = [
+            `${fetched.newlyDiscoveredCount} new`,
+            `${fetched.scannedDayCount} days scanned`,
+            `${fetched.meetings.length} total in fixture`,
+          ];
           phases.push({
             name: 'hkjc_fixture_fetch',
             status: 'success',
-            detail: `${fetched.meetings.length} meetings from HKJC`,
+            detail: detailParts.join(', '),
           });
-          hkjcMeetingsFetched = fetched.meetings.length;
         } else {
           phases.push({
             name: 'hkjc_fixture_fetch',
