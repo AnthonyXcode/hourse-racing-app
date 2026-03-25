@@ -31,8 +31,16 @@
     "jockeyName": {
       "type": "string"
     },
+    "jockeyId": {
+      "type": "string",
+      "description": "HKJC jockey identifier from profile URL (e.g. JockeyId query param)"
+    },
     "trainerName": {
       "type": "string"
+    },
+    "trainerId": {
+      "type": "string",
+      "description": "HKJC trainer identifier from profile URL (e.g. trainerid query param)"
     },
     "winOdds": {
       "type": "decimal"

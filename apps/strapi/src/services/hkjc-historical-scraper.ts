@@ -44,7 +44,9 @@ export type ScrapedRaceResult = {
     horseName?: string;
     horseCode?: string;
     jockeyName?: string;
+    jockeyId?: string;
     trainerName?: string;
+    trainerId?: string;
     winOdds?: number;
   }[];
   winDividend?: number;
@@ -366,7 +368,9 @@ export class HistoricalScraper {
       let horseName: string | undefined;
       let horseCode: string | undefined;
       let jockeyName: string | undefined;
+      let jockeyId: string | undefined;
       let trainerName: string | undefined;
+      let trainerId: string | undefined;
 
       $row.find('a').each((_, link) => {
         const href = $(link).attr('href') || '';
@@ -375,11 +379,15 @@ export class HistoricalScraper {
         if (href.includes('horse') || href.includes('Horse')) {
           horseName = text;
           const codeMatch = href.match(/horseid[=\/]([^&\/]+)/i);
-          if (codeMatch) horseCode = codeMatch[1];
+          if (codeMatch) horseCode = decodeURIComponent(codeMatch[1]!);
         } else if (href.includes('jockey') || href.includes('Jockey')) {
           jockeyName = text;
+          const jm = href.match(/jockeyid[=\/]([^&\/]+)/i);
+          if (jm) jockeyId = decodeURIComponent(jm[1]!);
         } else if (href.includes('trainer') || href.includes('Trainer')) {
           trainerName = text;
+          const tm = href.match(/trainerid[=\/]([^&\/]+)/i);
+          if (tm) trainerId = decodeURIComponent(tm[1]!);
         }
       });
 
@@ -391,7 +399,9 @@ export class HistoricalScraper {
         horseName,
         horseCode,
         jockeyName,
+        jockeyId,
         trainerName,
+        trainerId,
         winOdds: odds,
       });
     });

@@ -76,7 +76,21 @@ function mapFinishRow(row: unknown) {
   if (typeof r.horseName === 'string' && r.horseName) out.horseName = r.horseName;
   if (typeof r.horseCode === 'string' && r.horseCode) out.horseCode = r.horseCode;
   if (typeof r.jockeyName === 'string' && r.jockeyName) out.jockeyName = r.jockeyName;
+  const jockeyId =
+    typeof r.jockeyId === 'string' && r.jockeyId
+      ? r.jockeyId
+      : typeof r.jockeyCode === 'string' && r.jockeyCode
+        ? r.jockeyCode
+        : undefined;
+  if (jockeyId) out.jockeyId = jockeyId;
   if (typeof r.trainerName === 'string' && r.trainerName) out.trainerName = r.trainerName;
+  const trainerId =
+    typeof r.trainerId === 'string' && r.trainerId
+      ? r.trainerId
+      : typeof r.trainerCode === 'string' && r.trainerCode
+        ? r.trainerCode
+        : undefined;
+  if (trainerId) out.trainerId = trainerId;
   const odds = numOrUndef(r.winOdds);
   if (odds !== undefined) out.winOdds = odds;
   return out;

@@ -98,8 +98,10 @@ export interface HistoryFinishPlacing extends Struct.ComponentSchema {
         },
         number
       >;
+    jockeyId: Schema.Attribute.String;
     jockeyName: Schema.Attribute.String;
     margin: Schema.Attribute.Decimal;
+    trainerId: Schema.Attribute.String;
     trainerName: Schema.Attribute.String;
     winOdds: Schema.Attribute.Decimal;
   };
