@@ -58,7 +58,7 @@ export type ScrapedRaceResult = {
   trioDividend?: number;
 };
 
-/** Same identity fields as `history.finish-placing` minus result-only data (position, time, margin, odds). */
+/** Same identity fields as `history.finish-placing` minus result-only data (position, time, margin). */
 export type ScrapedRaceRunner = {
   horseNumber: number;
   horseName?: string;
@@ -67,6 +67,8 @@ export type ScrapedRaceRunner = {
   jockeyId?: string;
   trainerName?: string;
   trainerId?: string;
+  /** Win odds (decimal): local results SP column, or bet.hkjc WP when racecard-only. */
+  winOdds?: number;
   /** Strapi `api::jockey.jockey` documentId after person sync */
   jockeyDocumentId?: string;
   /** Strapi `api::trainer.trainer` documentId after person sync */
@@ -112,6 +114,30 @@ const DEFAULT_SCRAPER_CONFIG: ScraperConfig = {
   retries: 3,
   headless: true,
 };
+
+/**
+ * Parse bet.hkjc WP page HTML for win odds only (reference `RaceCardScraper.fetchCurrentOdds`).
+ */
+function parseWpWinOddsFromHtml(html: string): Map<number, number> {
+  const $ = cheerio.load(html);
+  const win = new Map<number, number>();
+  const seen = new Set<number>();
+
+  $("tr, [class*='runner'], [class*='horse'], [class*='row']").each((_, row) => {
+    const text = $(row).text().trim().replace(/\s+/g, ' ');
+    const numMatch = text.match(/^(\d+)/);
+    const oddsMatch = text.match(/(\d+\.\d+)\s*(\d+\.\d+)?\s*$/);
+    if (numMatch && oddsMatch) {
+      const horseNumber = parseInt(numMatch[1]!, 10);
+      if (horseNumber >= 1 && horseNumber <= 20 && !seen.has(horseNumber)) {
+        seen.add(horseNumber);
+        win.set(horseNumber, parseFloat(oddsMatch[1]!));
+      }
+    }
+  });
+
+  return win;
+}
 
 export class HistoricalScraper {
   private browser: Browser | null = null;
@@ -160,9 +186,45 @@ export class HistoricalScraper {
     this.lastRequestTime = Date.now();
   }
 
+  /**
+   * Win odds from bet.hkjc WP (racecard-only path). Past races use HKJC
+   * `localresults` (see `finishOrderToRunners` + `parseFinishOrder` Win Odds column).
+   */
+  private async mergeBettingWinOddsIntoRunners(
+    date: Date,
+    venueCode: 'ST' | 'HV',
+    raceNumber: number,
+    runners: ScrapedRaceRunner[]
+  ): Promise<void> {
+    if (runners.length === 0) return;
+    if (process.env.HKJC_BETTING_ODDS_FETCH_ENABLED === 'false') return;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const url = `https://bet.hkjc.com/en/racing/wp/${dateStr}/${venueCode}/${raceNumber}`;
+
+    try {
+      const html = await this.fetchPage(url, { extraWaitMs: 3000 });
+      const win = parseWpWinOddsFromHtml(html);
+      if (win.size === 0) return;
+
+      for (const r of runners) {
+        const w = win.get(r.horseNumber);
+        if (w != null && Number.isFinite(w)) {
+          r.winOdds = w;
+        }
+      }
+    } catch {
+      // Odds are optional
+    }
+  }
+
   /** Load URL with rate limiting and return HTML (custom HKJC paths for meeting metadata). */
-  async fetchPage(url: string): Promise<string> {
+  async fetchPage(url: string, opts?: { extraWaitMs?: number }): Promise<string> {
     await this.navigateTo(url);
+    const extra = opts?.extraWaitMs ?? 0;
+    if (extra > 0) {
+      await sleep(extra);
+    }
     if (!this.page) throw new Error('Browser not initialized');
     return this.page.content();
   }
@@ -459,7 +521,7 @@ export class HistoricalScraper {
     return finishOrder;
   }
 
-  /** Strip finish-position, time, margin, and odds from parsed results rows. */
+  /** Strip finish-position, time, margin; keep win odds from local results (Win Odds column). */
   private finishOrderToRunners(finish: ScrapedRaceResult['finishOrder']): ScrapedRaceRunner[] {
     const rows: ScrapedRaceRunner[] = finish.map((f) => {
       const r: ScrapedRaceRunner = { horseNumber: f.horseNumber };
@@ -469,6 +531,9 @@ export class HistoricalScraper {
       if (f.jockeyId) r.jockeyId = f.jockeyId;
       if (f.trainerName) r.trainerName = f.trainerName;
       if (f.trainerId) r.trainerId = f.trainerId;
+      if (f.winOdds != null && Number.isFinite(f.winOdds)) {
+        r.winOdds = f.winOdds;
+      }
       return r;
     });
     rows.sort((a, b) => a.horseNumber - b.horseNumber);
@@ -668,7 +733,7 @@ export class HistoricalScraper {
   ): Promise<ScrapedRaceMetadata | null> {
     const datePath = format(date, 'yyyy/MM/dd');
     const base = this.config.baseUrl;
-    const resultsUrl = `${base}/en-us/local/information/localresults?racedate=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
+    const resultsUrl = `${base}/en-us/local/information/localresults?RaceDate=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
 
     const htmlResults = await this.fetchPage(resultsUrl);
     const $r = cheerio.load(htmlResults);
@@ -701,7 +766,7 @@ export class HistoricalScraper {
 
     const dateStr = format(date, 'yyyy-MM-dd');
     const runners = this.finishOrderToRunners(finishOrder);
-    return {
+    const meta: ScrapedRaceMetadata = {
       raceId: `${dateStr}-${venueCode}-${raceNumber}`,
       raceDate: dateStr,
       venue: venueCode,
@@ -714,6 +779,7 @@ export class HistoricalScraper {
       prizeMoney: info.prizeMoney,
       runners,
     };
+    return meta;
   }
 
   private async scrapeRaceMetadataFromRacecardPages(
@@ -736,7 +802,7 @@ export class HistoricalScraper {
       const info = this.parseRacecardRaceInfo($);
       const runners = this.parseRacecardRunners($);
       const dateStr = format(date, 'yyyy-MM-dd');
-      return {
+      const meta: ScrapedRaceMetadata = {
         raceId: `${dateStr}-${venueCode}-${raceNumber}`,
         raceDate: dateStr,
         venue: venueCode,
@@ -749,6 +815,8 @@ export class HistoricalScraper {
         prizeMoney: info.prizeMoney,
         runners,
       };
+      await this.mergeBettingWinOddsIntoRunners(date, venueCode, raceNumber, meta.runners);
+      return meta;
     }
     return null;
   }

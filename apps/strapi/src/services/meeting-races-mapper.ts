@@ -8,6 +8,9 @@ function mapRunnerToStrapi(runner: ScrapedRaceRunner): Record<string, unknown> {
   if (runner.jockeyId) o.jockeyId = runner.jockeyId;
   if (runner.trainerName) o.trainerName = runner.trainerName;
   if (runner.trainerId) o.trainerId = runner.trainerId;
+  if (runner.winOdds != null && Number.isFinite(runner.winOdds)) {
+    o.winOdds = runner.winOdds;
+  }
   if (runner.jockeyDocumentId) {
     o.jockey = { connect: [runner.jockeyDocumentId] };
   }

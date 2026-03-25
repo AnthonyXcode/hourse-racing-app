@@ -214,7 +214,7 @@ export interface MeetingRaceMetadata extends Struct.ComponentSchema {
 export interface MeetingRaceRunner extends Struct.ComponentSchema {
   collectionName: 'components_meeting_race_runners';
   info: {
-    description: 'Horse line-up fields aligned with history.finish-placing, excluding result-only fields (position, time, margin, odds)';
+    description: 'Horse line-up fields aligned with history.finish-placing, excluding result-only fields (position, time, margin). Win odds: local results page (past); bet.hkjc WP when only racecard is available.';
     displayName: 'Race runner';
   };
   attributes: {
@@ -234,6 +234,7 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
     trainer: Schema.Attribute.Relation<'manyToOne', 'api::trainer.trainer'>;
     trainerId: Schema.Attribute.String;
     trainerName: Schema.Attribute.String;
+    winOdds: Schema.Attribute.Decimal;
   };
 }
 
