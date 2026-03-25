@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "trainers",
+  "info": {
+    "singularName": "trainer",
+    "pluralName": "trainers",
+    "displayName": "Trainer"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "displayName": {
+      "type": "string",
+      "required": true
+    },
+    "wins": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "seconds": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "thirds": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "totalRunners": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "winPercent": {
+      "type": "decimal"
+    },
+    "lastStatsSyncedAt": {
+      "type": "datetime"
+    }
+  }
+}

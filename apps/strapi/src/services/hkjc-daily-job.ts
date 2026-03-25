@@ -2,6 +2,7 @@ import { parse } from 'date-fns';
 import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
 import { HistoricalScraper } from './hkjc-historical-scraper';
 import { syncMissingMeetingHistories } from './hkjc-historical-sync';
+import { enrichMeetingRaceMetadatasWithJockeyTrainer } from './hkjc-jockey-trainer-sync';
 import { mapScrapedRaceMetadataToStrapiRaces } from './meeting-races-mapper';
 
 export type MeetingRow = { date: string; venue: 'ST' | 'HV' };
@@ -394,6 +395,7 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
               continue;
             }
 
+            await enrichMeetingRaceMetadatasWithJockeyTrainer(strapi, scraper, raceMetas);
             const racesPayload = mapScrapedRaceMetadataToStrapiRaces(raceMetas);
             await documents('api::meeting.meeting').update({
               documentId: row.documentId,

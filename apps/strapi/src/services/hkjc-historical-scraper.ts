@@ -67,6 +67,10 @@ export type ScrapedRaceRunner = {
   jockeyId?: string;
   trainerName?: string;
   trainerId?: string;
+  /** Strapi `api::jockey.jockey` documentId after person sync */
+  jockeyDocumentId?: string;
+  /** Strapi `api::trainer.trainer` documentId after person sync */
+  trainerDocumentId?: string;
 };
 
 /** Meeting.races row: non-result race fields plus runner line-up (no dividends / finish metrics). */

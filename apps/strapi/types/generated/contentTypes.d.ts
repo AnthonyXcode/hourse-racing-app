@@ -535,6 +535,89 @@ export interface ApiHistoryHistory extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiJockeyJockey extends Struct.CollectionTypeSchema {
+  collectionName: 'jockeys';
+  info: {
+    displayName: 'Jockey';
+    pluralName: 'jockeys';
+    singularName: 'jockey';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    displayName: Schema.Attribute.String & Schema.Attribute.Required;
+    fourths: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    key: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    lastStatsSyncedAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::jockey.jockey'
+    > &
+      Schema.Attribute.Private;
+    nationality: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    seconds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    stakesWon: Schema.Attribute.BigInteger & Schema.Attribute.DefaultTo<0>;
+    thirds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    totalRides: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    winPercent: Schema.Attribute.Decimal;
+    wins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    winsLast10Days: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+  };
+}
+
 export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
   collectionName: 'meetings';
   info: {
@@ -574,6 +657,71 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
       Schema.Attribute.Required;
+  };
+}
+
+export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
+  collectionName: 'trainers';
+  info: {
+    displayName: 'Trainer';
+    pluralName: 'trainers';
+    singularName: 'trainer';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    displayName: Schema.Attribute.String & Schema.Attribute.Required;
+    key: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    lastStatsSyncedAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::trainer.trainer'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    seconds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    thirds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    totalRunners: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    winPercent: Schema.Attribute.Decimal;
+    wins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
   };
 }
 
@@ -1091,7 +1239,9 @@ declare module '@strapi/strapi' {
       'api::fixture.fixture': ApiFixtureFixture;
       'api::healthcheck.healthcheck': ApiHealthcheckHealthcheck;
       'api::history.history': ApiHistoryHistory;
+      'api::jockey.jockey': ApiJockeyJockey;
       'api::meeting.meeting': ApiMeetingMeeting;
+      'api::trainer.trainer': ApiTrainerTrainer;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

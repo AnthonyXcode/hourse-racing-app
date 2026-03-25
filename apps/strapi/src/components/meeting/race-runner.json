@@ -30,6 +30,16 @@
     "trainerId": {
       "type": "string",
       "description": "HKJC trainer id from profile URL"
+    },
+    "jockey": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::jockey.jockey"
+    },
+    "trainer": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::trainer.trainer"
     }
   }
 }

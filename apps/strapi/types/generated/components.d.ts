@@ -228,8 +228,10 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
         },
         number
       >;
+    jockey: Schema.Attribute.Relation<'manyToOne', 'api::jockey.jockey'>;
     jockeyId: Schema.Attribute.String;
     jockeyName: Schema.Attribute.String;
+    trainer: Schema.Attribute.Relation<'manyToOne', 'api::trainer.trainer'>;
     trainerId: Schema.Attribute.String;
     trainerName: Schema.Attribute.String;
   };

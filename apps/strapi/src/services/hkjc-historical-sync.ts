@@ -33,7 +33,7 @@ export type HistoricalSyncStats = {
  *
  * Env:
  * - HKJC_HISTORICAL_SYNC_ENABLED — set to `false` to skip (default: on)
- * - HKJC_HISTORICAL_MAX_PER_RUN — max meetings to scrape per invocation (default: 5)
+ * - HKJC_HISTORICAL_MAX_PER_RUN — max meetings (one full result set) per invocation (default: 1, for HTTP trigger timeouts; raise for cron)
  * - HKJC_BASE_URL, HKJC_PLAYWRIGHT_HEADLESS, HKJC_RATE_LIMIT_PER_MIN — same as fixture fetch
  */
 export async function syncMissingMeetingHistories(
@@ -61,7 +61,7 @@ export async function syncMissingMeetingHistories(
     return empty;
   }
 
-  const maxPerRun = Math.max(1, Number(process.env.HKJC_HISTORICAL_MAX_PER_RUN || 5));
+  const maxPerRun = Math.max(1, Number(process.env.HKJC_HISTORICAL_MAX_PER_RUN || 1));
   const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
   const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
   const rateLimit = Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20);

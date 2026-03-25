@@ -1,0 +1,67 @@
+{
+  "kind": "collectionType",
+  "collectionName": "jockeys",
+  "info": {
+    "singularName": "jockey",
+    "pluralName": "jockeys",
+    "displayName": "Jockey"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "displayName": {
+      "type": "string",
+      "required": true
+    },
+    "nationality": {
+      "type": "string"
+    },
+    "wins": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "seconds": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "thirds": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "fourths": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "totalRides": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "winPercent": {
+      "type": "decimal"
+    },
+    "stakesWon": {
+      "type": "biginteger",
+      "default": 0
+    },
+    "winsLast10Days": {
+      "type": "integer",
+      "min": 0,
+      "default": 0
+    },
+    "lastStatsSyncedAt": {
+      "type": "datetime"
+    }
+  }
+}
