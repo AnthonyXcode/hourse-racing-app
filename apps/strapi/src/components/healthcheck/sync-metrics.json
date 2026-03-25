@@ -1,0 +1,27 @@
+{
+  "collectionName": "components_healthcheck_sync_metrics",
+  "info": {
+    "displayName": "Sync metrics",
+    "description": "Structured metrics for HKJC daily sync healthchecks"
+  },
+  "options": {},
+  "attributes": {
+    "hkjcMeetingsFetched": {
+      "type": "integer",
+      "min": 0
+    },
+    "meetingsCreated": {
+      "type": "integer",
+      "min": 0
+    },
+    "meetingsExisting": {
+      "type": "integer",
+      "min": 0
+    },
+    "phases": {
+      "type": "component",
+      "repeatable": true,
+      "component": "healthcheck.job-phase"
+    }
+  }
+}

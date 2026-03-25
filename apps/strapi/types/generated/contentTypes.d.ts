@@ -484,7 +484,7 @@ export interface ApiHealthcheckHealthcheck extends Struct.CollectionTypeSchema {
       'api::healthcheck.healthcheck'
     > &
       Schema.Attribute.Private;
-    metrics: Schema.Attribute.JSON;
+    metrics: Schema.Attribute.Component<'healthcheck.sync-metrics', false>;
     publishedAt: Schema.Attribute.DateTime;
     startedAt: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<

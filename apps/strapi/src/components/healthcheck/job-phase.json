@@ -1,0 +1,22 @@
+{
+  "collectionName": "components_healthcheck_job_phases",
+  "info": {
+    "displayName": "Job phase",
+    "description": "One step of a healthcheck job run"
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["success", "failure", "partial", "skipped"],
+      "required": true
+    },
+    "detail": {
+      "type": "text"
+    }
+  }
+}

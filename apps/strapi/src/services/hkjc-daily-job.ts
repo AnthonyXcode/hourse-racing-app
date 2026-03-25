@@ -35,6 +35,41 @@ async function upsertStrapiFixture(documents: any, store: FixtureStore): Promise
   }
 }
 
+type PhaseStatus = 'success' | 'failure' | 'partial' | 'skipped';
+
+type PhaseEntry = { name: string; status: PhaseStatus; detail?: string };
+
+function metricsPayload(
+  phases: PhaseEntry[],
+  counts: {
+    hkjcMeetingsFetched?: number;
+    meetingsCreated?: number;
+    meetingsExisting?: number;
+  }
+) {
+  const phasesOut = phases.map((p) => ({
+    name: p.name,
+    status: p.status,
+    ...(p.detail != null && String(p.detail).length > 0 ? { detail: p.detail } : {}),
+  }));
+  const out: {
+    phases: typeof phasesOut;
+    hkjcMeetingsFetched?: number;
+    meetingsCreated?: number;
+    meetingsExisting?: number;
+  } = { phases: phasesOut };
+  if (counts.hkjcMeetingsFetched != null) {
+    out.hkjcMeetingsFetched = counts.hkjcMeetingsFetched;
+  }
+  if (counts.meetingsCreated != null) {
+    out.meetingsCreated = counts.meetingsCreated;
+  }
+  if (counts.meetingsExisting != null) {
+    out.meetingsExisting = counts.meetingsExisting;
+  }
+  return out;
+}
+
 /** Map Fixture.meetings components to MeetingRow[] */
 function meetingsFromFixtureData(rows: unknown): MeetingRow[] {
   if (!Array.isArray(rows)) return [];
@@ -76,10 +111,10 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
     return;
   }
 
-  const metrics: Record<string, unknown> = {
-    phases: [] as object[],
-  };
-  const phases = metrics.phases as { name: string; status: string; detail?: string }[];
+  const phases: PhaseEntry[] = [];
+  let hkjcMeetingsFetched: number | undefined;
+  let meetingsCreated: number | undefined;
+  let meetingsExisting: number | undefined;
 
   const fail = async (summary: string) => {
     await documents('api::healthcheck.healthcheck').update({
@@ -88,7 +123,11 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         status: 'failure',
         completedAt: new Date().toISOString(),
         summary,
-        metrics,
+        metrics: metricsPayload(phases, {
+          hkjcMeetingsFetched,
+          meetingsCreated,
+          meetingsExisting,
+        }),
       },
     });
   };
@@ -120,7 +159,7 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
             status: 'success',
             detail: `${fetched.meetings.length} meetings from HKJC`,
           });
-          metrics.hkjcMeetingsFetched = fetched.meetings.length;
+          hkjcMeetingsFetched = fetched.meetings.length;
         } else {
           phases.push({
             name: 'hkjc_fixture_fetch',
@@ -196,8 +235,8 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         status: 'success',
         detail: `created ${created}, already had ${alreadyHad}`,
       });
-      metrics.meetingsCreated = created;
-      metrics.meetingsExisting = alreadyHad;
+      meetingsCreated = created;
+      meetingsExisting = alreadyHad;
     } else {
       phases.push({ name: 'meetings', status: 'skipped', detail: 'No meetings to sync' });
     }
@@ -213,7 +252,11 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         status: overall,
         completedAt: new Date().toISOString(),
         summary: 'Daily HKJC sync finished',
-        metrics,
+        metrics: metricsPayload(phases, {
+          hkjcMeetingsFetched,
+          meetingsCreated,
+          meetingsExisting,
+        }),
       },
     });
   } catch (e) {
