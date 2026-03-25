@@ -204,9 +204,34 @@ export interface MeetingRaceMetadata extends Struct.ComponentSchema {
         },
         number
       >;
+    runners: Schema.Attribute.Component<'meeting.race-runner', true>;
     surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
     venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
       Schema.Attribute.Required;
+  };
+}
+
+export interface MeetingRaceRunner extends Struct.ComponentSchema {
+  collectionName: 'components_meeting_race_runners';
+  info: {
+    description: 'Horse line-up fields aligned with history.finish-placing, excluding result-only fields (position, time, margin, odds)';
+    displayName: 'Race runner';
+  };
+  attributes: {
+    horseCode: Schema.Attribute.String;
+    horseName: Schema.Attribute.String;
+    horseNumber: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    jockeyId: Schema.Attribute.String;
+    jockeyName: Schema.Attribute.String;
+    trainerId: Schema.Attribute.String;
+    trainerName: Schema.Attribute.String;
   };
 }
 
@@ -219,6 +244,7 @@ declare module '@strapi/strapi' {
       'history.finish-placing': HistoryFinishPlacing;
       'history.race-result': HistoryRaceResult;
       'meeting.race-metadata': MeetingRaceMetadata;
+      'meeting.race-runner': MeetingRaceRunner;
     }
   }
 }

@@ -54,6 +54,11 @@
     },
     "prizeMoney": {
       "type": "biginteger"
+    },
+    "runners": {
+      "type": "component",
+      "repeatable": true,
+      "component": "meeting.race-runner"
     }
   }
 }

@@ -58,7 +58,18 @@ export type ScrapedRaceResult = {
   trioDividend?: number;
 };
 
-/** Meeting.races row: same non-result fields as History `race-result`, no dividends or finish rows. */
+/** Same identity fields as `history.finish-placing` minus result-only data (position, time, margin, odds). */
+export type ScrapedRaceRunner = {
+  horseNumber: number;
+  horseName?: string;
+  horseCode?: string;
+  jockeyName?: string;
+  jockeyId?: string;
+  trainerName?: string;
+  trainerId?: string;
+};
+
+/** Meeting.races row: non-result race fields plus runner line-up (no dividends / finish metrics). */
 export type ScrapedRaceMetadata = {
   raceId: string;
   raceDate: string;
@@ -79,6 +90,7 @@ export type ScrapedRaceMetadata = {
     | 'Wet Fast'
     | 'Wet Slow';
   prizeMoney: number;
+  runners: ScrapedRaceRunner[];
 };
 
 export interface ScraperConfig {
@@ -443,6 +455,108 @@ export class HistoricalScraper {
     return finishOrder;
   }
 
+  /** Strip finish-position, time, margin, and odds from parsed results rows. */
+  private finishOrderToRunners(finish: ScrapedRaceResult['finishOrder']): ScrapedRaceRunner[] {
+    const rows: ScrapedRaceRunner[] = finish.map((f) => {
+      const r: ScrapedRaceRunner = { horseNumber: f.horseNumber };
+      if (f.horseName) r.horseName = f.horseName;
+      if (f.horseCode) r.horseCode = f.horseCode;
+      if (f.jockeyName) r.jockeyName = f.jockeyName;
+      if (f.jockeyId) r.jockeyId = f.jockeyId;
+      if (f.trainerName) r.trainerName = f.trainerName;
+      if (f.trainerId) r.trainerId = f.trainerId;
+      return r;
+    });
+    rows.sort((a, b) => a.horseNumber - b.horseNumber);
+    return rows;
+  }
+
+  /**
+   * Declarations table on racecard HTML (reference raceCard.parseEntryRow; no weights/gear).
+   */
+  private parseRacecardRunners($: cheerio.CheerioAPI): ScrapedRaceRunner[] {
+    const out: ScrapedRaceRunner[] = [];
+
+    $('table tr').each((_, row) => {
+      const $row = $(row);
+      if ($row.find('th').length > 0) return;
+
+      const cells = $row.find('td');
+      if (cells.length < 5) return;
+
+      const cellTexts = cells.map((_, cell) => $(cell).text().trim()).get();
+      const horseNumText = cellTexts[0]?.replace(/[^\d]/g, '') || '';
+      const horseNumber = parseInt(horseNumText, 10);
+      if (isNaN(horseNumber) || horseNumber < 1 || horseNumber > 20) return;
+
+      const hasHorseLink =
+        $row.find('a[href*="horse" i]').length > 0 || $row.find('a[href*="Horse"]').length > 0;
+      if (!hasHorseLink) return;
+
+      let horseName = '';
+      let horseCode: string | undefined;
+      let jockeyName: string | undefined;
+      let jockeyId: string | undefined;
+      let trainerName: string | undefined;
+      let trainerId: string | undefined;
+      let hasJockeyLink = false;
+
+      $row.find('a').each((_, link) => {
+        const $link = $(link);
+        const href = $link.attr('href') || '';
+        const text = $link.text().trim();
+
+        if (href.includes('horse') || href.includes('Horse')) {
+          if (text.length >= 1) horseName = text;
+          const codeMatch = href.match(/horseid[=\/]([^&\/]+)/i);
+          if (codeMatch) horseCode = decodeURIComponent(codeMatch[1]!);
+        } else if (href.includes('jockey') || href.includes('Jockey')) {
+          hasJockeyLink = true;
+          const jm = href.match(/jockeyid[=\/]([^&\/]+)/i);
+          if (jm) jockeyId = decodeURIComponent(jm[1]!);
+          if (text.length >= 2) {
+            jockeyName = text;
+          } else {
+            const title = $link.attr('title')?.trim();
+            let parentText = $link.closest('td').text().trim();
+            parentText = parentText.split(/\s*[\n\r]\s*/)[0]?.trim() ?? parentText;
+            if (title && title.length >= 2 && title.length < 50) jockeyName = title;
+            else if (parentText && parentText.length >= 2 && parentText.length < 50)
+              jockeyName = parentText;
+          }
+        } else if (href.includes('trainer') || href.includes('Trainer')) {
+          const tm = href.match(/trainerid[=\/]([^&\/]+)/i);
+          if (tm) trainerId = decodeURIComponent(tm[1]!);
+          if (text.length >= 2) {
+            trainerName = text;
+          } else {
+            const title = $link.attr('title')?.trim();
+            let parentText = $link.closest('td').text().trim();
+            parentText = parentText.split(/\s*[\n\r]\s*/)[0]?.trim() ?? parentText;
+            if (title && title.length >= 2 && title.length < 50) trainerName = title;
+            else if (parentText && parentText.length >= 2 && parentText.length < 50)
+              trainerName = parentText;
+          }
+        }
+      });
+
+      if (!hasJockeyLink) return;
+      if (!horseName || horseName.length < 2) return;
+
+      const r: ScrapedRaceRunner = { horseNumber };
+      r.horseName = horseName;
+      if (horseCode) r.horseCode = horseCode;
+      if (jockeyName) r.jockeyName = jockeyName;
+      if (jockeyId) r.jockeyId = jockeyId;
+      if (trainerName) r.trainerName = trainerName;
+      if (trainerId) r.trainerId = trainerId;
+      out.push(r);
+    });
+
+    out.sort((a, b) => a.horseNumber - b.horseNumber);
+    return out;
+  }
+
   private parseDividends($: cheerio.CheerioAPI): {
     winDividend?: number;
     placeDividends?: number[];
@@ -582,6 +696,7 @@ export class HistoricalScraper {
     }
 
     const dateStr = format(date, 'yyyy-MM-dd');
+    const runners = this.finishOrderToRunners(finishOrder);
     return {
       raceId: `${dateStr}-${venueCode}-${raceNumber}`,
       raceDate: dateStr,
@@ -593,6 +708,7 @@ export class HistoricalScraper {
       surface: info.surface,
       going: info.going,
       prizeMoney: info.prizeMoney,
+      runners,
     };
   }
 
@@ -614,6 +730,7 @@ export class HistoricalScraper {
         continue;
       }
       const info = this.parseRacecardRaceInfo($);
+      const runners = this.parseRacecardRunners($);
       const dateStr = format(date, 'yyyy-MM-dd');
       return {
         raceId: `${dateStr}-${venueCode}-${raceNumber}`,
@@ -626,6 +743,7 @@ export class HistoricalScraper {
         surface: info.surface,
         going: info.going,
         prizeMoney: info.prizeMoney,
+        runners,
       };
     }
     return null;

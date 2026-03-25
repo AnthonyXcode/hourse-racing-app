@@ -22,6 +22,22 @@ function dedupeMeetingRows(rows: MeetingRow[]): MeetingRow[] {
   return out;
 }
 
+/** Max `raceDate` among fixture slots (ISO yyyy-MM-dd). */
+function latestFixtureDate(slots: MeetingRow[]): string | null {
+  let max: string | null = null;
+  for (const s of slots) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) continue;
+    if (max == null || s.date > max) max = s.date;
+  }
+  return max;
+}
+
+function meetingHasRaceDetails(row: unknown): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const races = (row as { races?: unknown }).races;
+  return Array.isArray(races) && races.length > 0;
+}
+
 function normalizeRaceDate(value: unknown): string {
   if (value == null) return '';
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -323,9 +339,10 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
       meetingsExisting = alreadyHad;
 
       const fetchEnabled = process.env.HKJC_MEETING_DETAILS_FETCH_ENABLED !== 'false';
+      // Default 1 per run so HTTP triggers return before proxy/browser timeouts; raise via env for cron.
       const maxDetailMeetings = Math.max(
         1,
-        Number(process.env.HKJC_MEETINGS_DETAILS_MAX_MEETINGS || 30)
+        Number(process.env.HKJC_MEETINGS_DETAILS_MAX_MEETINGS || 1)
       );
       let detailsUpdated = 0;
       let detailsFailed = 0;
@@ -337,22 +354,33 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
           detail: 'HKJC_MEETING_DETAILS_FETCH_ENABLED=false',
         });
       } else {
+        const latestDate = latestFixtureDate(meetings);
         const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
         const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
         const rateLimit = Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20);
         const scraper = new HistoricalScraper({ baseUrl, headless, rateLimit });
         let processed = 0;
+        let detailsSkipped = 0;
         try {
           await scraper.init();
           for (const m of meetings) {
             if (processed >= maxDetailMeetings) break;
-            processed++;
             const key = meetingKey(m.date, m.venue);
             const row = await documents('api::meeting.meeting').findFirst({
               filters: { key: { $eq: key } },
+              populate: {
+                races: { populate: ['runners'] },
+              },
             });
             if (!row?.documentId) continue;
 
+            const isLatestSlot = latestDate != null && m.date === latestDate;
+            if (!isLatestSlot && meetingHasRaceDetails(row)) {
+              detailsSkipped++;
+              continue;
+            }
+
+            processed++;
             const meetingDate = parse(m.date, 'yyyy-MM-dd', new Date());
             let raceMetas = await scraper.scrapeFullMeetingRaceMetadata(meetingDate, m.venue);
             if (raceMetas.length === 0) {
@@ -399,7 +427,15 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
           phases.push({
             name: 'meeting_race_details',
             status: detailStatus,
-            detail: `updated ${detailsUpdated}, no data ${detailsFailed}, cap ${maxDetailMeetings} meetings`,
+            detail: [
+              `updated ${detailsUpdated}`,
+              `skipped ${detailsSkipped} (already had races, not latest date)`,
+              `no data ${detailsFailed}`,
+              `cap ${maxDetailMeetings} fetches`,
+              latestDate ? `latest raceDate ${latestDate} always refreshed` : '',
+            ]
+              .filter(Boolean)
+              .join(', '),
           });
         }
       }
