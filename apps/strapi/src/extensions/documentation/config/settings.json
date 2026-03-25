@@ -1,0 +1,38 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Horse Racing API",
+    "description": "Strapi REST API for the horse racing app, including HKJC fixture sync.",
+    "contact": {
+      "name": "API"
+    },
+    "license": {
+      "name": "Private"
+    }
+  },
+  "x-strapi-config": {
+    "plugins": ["upload", "users-permissions"]
+  },
+  "servers": [],
+  "externalDocs": {
+    "description": "Strapi documentation",
+    "url": "https://docs.strapi.io"
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {},
+  "tags": [],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
