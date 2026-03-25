@@ -1,7 +1,7 @@
 import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
 import { syncMissingMeetingHistories } from './hkjc-historical-sync';
 
-type MeetingRow = { date: string; venue: 'ST' | 'HV' };
+export type MeetingRow = { date: string; venue: 'ST' | 'HV' };
 
 function meetingKey(date: string, venue: string): string {
   return `${date}_${venue}`;
@@ -15,7 +15,7 @@ function normalizeRaceDate(value: unknown): string {
 }
 
 /** Load all Fixture collection rows as meeting slots (paged). */
-async function loadAllFixtureMeetings(documents: any): Promise<MeetingRow[]> {
+export async function loadAllFixtureMeetings(documents: any): Promise<MeetingRow[]> {
   const pageSize = 500;
   const all: MeetingRow[] = [];
   let page = 1;
@@ -92,31 +92,147 @@ function metricsPayload(
 }
 
 /**
- * Daily job: fetch upcoming fixtures from HKJC (Playwright), add Fixture rows, then ensure Meeting entries exist.
+ * 6:00 cron — HKJC Playwright scan → new Fixture rows only.
  */
-export async function runHkjcDailyJob(strapi: any): Promise<void> {
+export async function runHkjcFixtureJob(strapi: any): Promise<void> {
   const documents = strapi.documents;
   if (!documents) {
-    strapi.log.error('hkjc-daily-job: strapi.documents unavailable');
+    strapi.log.error('hkjc-fixture-job: strapi.documents unavailable');
     return;
   }
 
   const hc = await documents('api::healthcheck.healthcheck').create({
     data: {
-      jobName: 'daily_hkjc_sync',
+      jobName: 'hkjc_fixture',
       startedAt: new Date().toISOString(),
       status: 'running',
-      summary: 'Started daily HKJC sync',
+      summary: 'HKJC fixture fetch started',
     },
   });
   const hcId = hc?.documentId;
   if (!hcId) {
-    strapi.log.error('hkjc-daily-job: could not create healthcheck');
+    strapi.log.error('hkjc-fixture-job: could not create healthcheck');
     return;
   }
 
   const phases: PhaseEntry[] = [];
   let hkjcMeetingsFetched: number | undefined;
+
+  const fail = async (summary: string) => {
+    await documents('api::healthcheck.healthcheck').update({
+      documentId: hcId,
+      data: {
+        status: 'failure',
+        completedAt: new Date().toISOString(),
+        summary,
+        metrics: metricsPayload(phases, { hkjcMeetingsFetched }),
+      },
+    });
+  };
+
+  try {
+    if (process.env.HKJC_FIXTURE_FETCH_ENABLED === 'false') {
+      phases.push({
+        name: 'hkjc_fixture_fetch',
+        status: 'skipped',
+        detail: 'HKJC_FIXTURE_FETCH_ENABLED=false',
+      });
+    } else {
+      const daysAhead = Math.min(
+        366,
+        Math.max(1, Number(process.env.HKJC_FIXTURE_FETCH_DAYS || 120))
+      );
+      const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
+      try {
+        const existingSlots = await loadAllFixtureMeetings(documents);
+        strapi.log.info(
+          `hkjc-fixture-job: fetching HKJC (${daysAhead}d ahead, ${existingSlots.length} existing slots, headless=${headless})`
+        );
+        const fetched = await fetchHkjcFixtures({
+          daysAhead,
+          headless,
+          baseUrl: process.env.HKJC_BASE_URL,
+          rateLimitPerMinute: Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20),
+          existingMeetings: existingSlots,
+        });
+        hkjcMeetingsFetched = fetched.newlyDiscoveredCount;
+        if (fetched.scannedDayCount > 0 && fetched.discoveredThisRun.length > 0) {
+          await createFixtureRowsIfMissing(documents, fetched.discoveredThisRun);
+        }
+        if (fetched.meetings.length > 0) {
+          phases.push({
+            name: 'hkjc_fixture_fetch',
+            status: 'success',
+            detail: [
+              `${fetched.newlyDiscoveredCount} new`,
+              `${fetched.scannedDayCount} days scanned`,
+              `${fetched.meetings.length} total merged`,
+            ].join(', '),
+          });
+        } else {
+          phases.push({
+            name: 'hkjc_fixture_fetch',
+            status: 'partial',
+            detail: 'No meetings in scan window',
+          });
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        phases.push({ name: 'hkjc_fixture_fetch', status: 'failure', detail: msg });
+        strapi.log.warn(`hkjc-fixture-job: ${msg}`);
+      }
+    }
+
+    const anyFailure = phases.some((p) => p.status === 'failure');
+    const anyPartial = phases.some((p) => p.status === 'partial');
+    const overall =
+      anyFailure && phases.every((p) => p.status === 'failure' || p.status === 'skipped')
+        ? 'failure'
+        : anyFailure || anyPartial
+          ? 'partial'
+          : 'success';
+
+    await documents('api::healthcheck.healthcheck').update({
+      documentId: hcId,
+      data: {
+        status: overall,
+        completedAt: new Date().toISOString(),
+        summary: 'HKJC fixture job finished',
+        metrics: metricsPayload(phases, { hkjcMeetingsFetched }),
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    strapi.log.error(`hkjc-fixture-job: ${msg}`);
+    await fail(msg);
+  }
+}
+
+/**
+ * 6:30 cron — Fixture collection → Meeting rows (by key).
+ */
+export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
+  const documents = strapi.documents;
+  if (!documents) {
+    strapi.log.error('hkjc-meetings-job: strapi.documents unavailable');
+    return;
+  }
+
+  const hc = await documents('api::healthcheck.healthcheck').create({
+    data: {
+      jobName: 'hkjc_meetings',
+      startedAt: new Date().toISOString(),
+      status: 'running',
+      summary: 'HKJC meetings sync started',
+    },
+  });
+  const hcId = hc?.documentId;
+  if (!hcId) {
+    strapi.log.error('hkjc-meetings-job: could not create healthcheck');
+    return;
+  }
+
+  const phases: PhaseEntry[] = [];
   let meetingsCreated: number | undefined;
   let meetingsExisting: number | undefined;
 
@@ -127,98 +243,26 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         status: 'failure',
         completedAt: new Date().toISOString(),
         summary,
-        metrics: metricsPayload(phases, {
-          hkjcMeetingsFetched,
-          meetingsCreated,
-          meetingsExisting,
-        }),
+        metrics: metricsPayload(phases, { meetingsCreated, meetingsExisting }),
       },
     });
   };
 
   try {
-    let meetings: MeetingRow[] = [];
-
-    if (process.env.HKJC_FIXTURE_FETCH_ENABLED !== 'false') {
-      const daysAhead = Math.min(
-        366,
-        Math.max(1, Number(process.env.HKJC_FIXTURE_FETCH_DAYS || 120))
-      );
-      const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
-      try {
-        const existingSlots = await loadAllFixtureMeetings(documents);
-        strapi.log.info(
-          `hkjc-daily-job: fetching HKJC fixtures (${daysAhead} days ahead, ${existingSlots.length} existing slots, headless=${headless})`
-        );
-        const fetched = await fetchHkjcFixtures({
-          daysAhead,
-          headless,
-          baseUrl: process.env.HKJC_BASE_URL,
-          rateLimitPerMinute: Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20),
-          existingMeetings: existingSlots,
-        });
-        meetings = fetched.meetings;
-        hkjcMeetingsFetched = fetched.newlyDiscoveredCount;
-        if (fetched.scannedDayCount > 0 && fetched.discoveredThisRun.length > 0) {
-          await createFixtureRowsIfMissing(documents, fetched.discoveredThisRun);
-        }
-        if (fetched.meetings.length > 0) {
-          const detailParts = [
-            `${fetched.newlyDiscoveredCount} new`,
-            `${fetched.scannedDayCount} days scanned`,
-            `${fetched.meetings.length} total in fixture`,
-          ];
-          phases.push({
-            name: 'hkjc_fixture_fetch',
-            status: 'success',
-            detail: detailParts.join(', '),
-          });
-        } else {
-          phases.push({
-            name: 'hkjc_fixture_fetch',
-            status: 'partial',
-            detail: 'No meetings found in date window (check HKJC / selectors)',
-          });
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        phases.push({ name: 'hkjc_fixture_fetch', status: 'failure', detail: msg });
-        strapi.log.warn(`hkjc-daily-job: HKJC fixture fetch failed: ${msg}`);
-      }
-    } else {
-      phases.push({
-        name: 'hkjc_fixture_fetch',
-        status: 'skipped',
-        detail: 'HKJC_FIXTURE_FETCH_ENABLED=false',
-      });
-    }
-
+    const meetings = await loadAllFixtureMeetings(documents);
     if (meetings.length === 0) {
-      meetings = await loadAllFixtureMeetings(documents);
-      if (meetings.length > 0) {
-        phases.push({
-          name: 'fixtures_fallback',
-          status: 'success',
-          detail: `Using ${meetings.length} meetings from Fixture collection`,
-        });
-      }
-    }
-
-    if (meetings.length > 0) {
+      phases.push({
+        name: 'fixtures',
+        status: 'skipped',
+        detail: 'Fixture collection empty',
+      });
+      phases.push({ name: 'meetings', status: 'skipped', detail: 'Nothing to sync' });
+    } else {
       phases.push({
         name: 'fixtures',
         status: 'success',
-        detail: `${meetings.length} meeting slots to sync`,
+        detail: `${meetings.length} slots from Fixture`,
       });
-    } else {
-      phases.push({
-        name: 'fixtures',
-        status: 'skipped',
-        detail: 'No meetings (HKJC fetch empty and Fixture collection empty)',
-      });
-    }
-
-    if (meetings.length > 0) {
       let created = 0;
       let alreadyHad = 0;
       for (const m of meetings) {
@@ -240,18 +284,87 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
         });
         created++;
       }
+      meetingsCreated = created;
+      meetingsExisting = alreadyHad;
       phases.push({
         name: 'meetings',
         status: 'success',
         detail: `created ${created}, already had ${alreadyHad}`,
       });
-      meetingsCreated = created;
-      meetingsExisting = alreadyHad;
-    } else {
-      phases.push({ name: 'meetings', status: 'skipped', detail: 'No meetings to sync' });
     }
 
-    if (meetings.length > 0 && process.env.HKJC_HISTORICAL_SYNC_ENABLED !== 'false') {
+    const anyFailure = phases.some((p) => p.status === 'failure');
+    const overall = anyFailure ? 'failure' : 'success';
+
+    await documents('api::healthcheck.healthcheck').update({
+      documentId: hcId,
+      data: {
+        status: overall,
+        completedAt: new Date().toISOString(),
+        summary: 'HKJC meetings job finished',
+        metrics: metricsPayload(phases, { meetingsCreated, meetingsExisting }),
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    strapi.log.error(`hkjc-meetings-job: ${msg}`);
+    await fail(msg);
+  }
+}
+
+/**
+ * 6:45 cron — Past meetings without History → scrape + History rows.
+ */
+export async function runHkjcHistoryJob(strapi: any): Promise<void> {
+  const documents = strapi.documents;
+  if (!documents) {
+    strapi.log.error('hkjc-history-job: strapi.documents unavailable');
+    return;
+  }
+
+  const hc = await documents('api::healthcheck.healthcheck').create({
+    data: {
+      jobName: 'hkjc_history',
+      startedAt: new Date().toISOString(),
+      status: 'running',
+      summary: 'HKJC historical sync started',
+    },
+  });
+  const hcId = hc?.documentId;
+  if (!hcId) {
+    strapi.log.error('hkjc-history-job: could not create healthcheck');
+    return;
+  }
+
+  const phases: PhaseEntry[] = [];
+
+  const fail = async (summary: string) => {
+    await documents('api::healthcheck.healthcheck').update({
+      documentId: hcId,
+      data: {
+        status: 'failure',
+        completedAt: new Date().toISOString(),
+        summary,
+        metrics: metricsPayload(phases, {}),
+      },
+    });
+  };
+
+  try {
+    const meetings = await loadAllFixtureMeetings(documents);
+    if (meetings.length === 0) {
+      phases.push({
+        name: 'historical_sync',
+        status: 'skipped',
+        detail: 'Fixture collection empty',
+      });
+    } else if (process.env.HKJC_HISTORICAL_SYNC_ENABLED === 'false') {
+      phases.push({
+        name: 'historical_sync',
+        status: 'skipped',
+        detail: 'HKJC_HISTORICAL_SYNC_ENABLED=false',
+      });
+    } else {
       const hist = await syncMissingMeetingHistories(strapi, meetings);
       if (hist.pastMeetingsTotal > 0) {
         const histParts = [
@@ -268,30 +381,31 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
           status: histStatus,
           detail: histParts.join(', '),
         });
+      } else {
+        phases.push({
+          name: 'historical_sync',
+          status: 'skipped',
+          detail: 'No past meeting dates in fixture list',
+        });
       }
     }
 
     const anyFailure = phases.some((p) => p.status === 'failure');
     const anyPartial = phases.some((p) => p.status === 'partial');
-    const overall =
-      anyFailure && meetings.length === 0 ? 'failure' : anyFailure || anyPartial ? 'partial' : 'success';
+    const overall = anyFailure ? 'failure' : anyPartial ? 'partial' : 'success';
 
     await documents('api::healthcheck.healthcheck').update({
       documentId: hcId,
       data: {
         status: overall,
         completedAt: new Date().toISOString(),
-        summary: 'Daily HKJC sync finished',
-        metrics: metricsPayload(phases, {
-          hkjcMeetingsFetched,
-          meetingsCreated,
-          meetingsExisting,
-        }),
+        summary: 'HKJC history job finished',
+        metrics: metricsPayload(phases, {}),
       },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    strapi.log.error(`hkjc-daily-job: ${msg}`);
+    strapi.log.error(`hkjc-history-job: ${msg}`);
     await fail(msg);
   }
 }

@@ -57,11 +57,11 @@ Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/
 | When | What runs |
 |------|-----------|
 | **App bootstrap** | Optional **Fixture** row creation from `data/fixtures.seed.json` via `seedFixtureFromSeedFile` (skipped if `HKJC_FIXTURE_SYNC_ON_BOOT=false`). |
-| **Cron** | `runHkjcSyncOnce` → `runHkjcDailyJob` on `HKJC_CRON_SCHEDULE` (disabled if `HKJC_CRON_ENABLED=false`). |
-| **After listen (optional)** | Same sync job if `HKJC_CRON_RUN_ON_BOOT=true`. |
-| **HTTP** | `POST /api/hkjc-sync/trigger` with `x-hkjc-sync-secret` (when `HKJC_SYNC_TRIGGER_SECRET` is set). |
+| **Cron** | Three jobs (disabled if `HKJC_CRON_ENABLED=false`): fixture `HKJC_CRON_FIXTURE_SCHEDULE` (default `0 6 * * *`), meetings `HKJC_CRON_MEETINGS_SCHEDULE` (default `30 6 * * *`), history `HKJC_CRON_HISTORY_SCHEDULE` (default `45 6 * * *`). Time zone: `HKJC_CRON_TZ` (default `Asia/Hong_Kong`). |
+| **After listen (optional)** | Fixture job only if `HKJC_CRON_RUN_ON_BOOT=true` (meetings/history still follow cron). |
+| **HTTP** | `POST /api/hkjc-sync/trigger/fixture`, `.../meetings`, `.../history` with `x-hkjc-sync-secret` (when `HKJC_SYNC_TRIGGER_SECRET` is set). Legacy `POST /api/hkjc-sync/trigger` is the same as fixture. |
 
-The daily HKJC job is serialized: a second trigger while a run is active is ignored (`runHkjcSyncOnce` guard).
+Each job type is serialized separately: a second trigger for the same job while it is running returns 409; the other two jobs can still run.
 
 ### Sequence diagram
 
@@ -71,9 +71,10 @@ sequenceDiagram
   participant Boot as App bootstrap
   participant Seed as fixture-seed
   participant Fx as Fixture
-  participant Trig as Sync trigger
-  participant Run as runHkjcSyncOnce
-  participant Job as runHkjcDailyJob
+  participant Trig as Triggers (cron / boot / HTTP)
+  participant Fj as Fixture job
+  participant Mj as Meetings job
+  participant Hj as History job
   participant Hc as Healthcheck
   participant Web as HKJC site
   participant Mt as Meeting
@@ -87,32 +88,35 @@ sequenceDiagram
     end
   end
 
-  Trig->>Run: cron / boot delay / POST trigger
-  Run->>Job: runHkjcDailyJob (if lock free)
-  Job->>Hc: create jobName, startedAt, status running
-
+  Trig->>Fj: 6:00 cron / boot / POST .../trigger/fixture
+  Fj->>Hc: jobName hkjc_fixture
   alt fixture fetch enabled and succeeds
-    Job->>Web: Playwright fixture scrape
-    Web-->>Job: meeting rows
-    Job->>Fx: create missing Fixture rows (key, raceDate, venue)
-  else no fetch or empty result
-    Job->>Fx: read Fixture collection (fallback list)
+    Fj->>Web: Playwright fixture scrape
+    Web-->>Fj: meeting rows
+    Fj->>Fx: create missing Fixture rows (key, raceDate, venue)
   end
+  Fj->>Hc: update status, metrics
 
-  loop each date or venue slot in resolved list
-    Job->>Mt: create if no row for key
+  Trig->>Mj: 6:30 cron / POST .../trigger/meetings
+  Mj->>Hc: jobName hkjc_meetings
+  Mj->>Fx: load fixture list
+  loop each date or venue slot
+    Mj->>Mt: create if no row for key
   end
+  Mj->>Hc: update status, metrics
 
+  Trig->>Hj: 6:45 cron / POST .../trigger/history
+  Hj->>Hc: jobName hkjc_history
+  Hj->>Fx: load fixture list
   opt historical sync enabled
-    Note over Job, Hi: Past dates only; capped by HKJC_HISTORICAL_MAX_PER_RUN
+    Note over Hj, Hi: Past dates only; capped by HKJC_HISTORICAL_MAX_PER_RUN
     loop missing past Meeting with no History
-      Job->>Web: scrape local results (Playwright)
-      Job->>Hi: create linked History plus results components
-      Job->>Mt: update scrapeStatus, lastScrapedAt
+      Hj->>Web: scrape local results (Playwright)
+      Hj->>Hi: create linked History plus results components
+      Hj->>Mt: update scrapeStatus, lastScrapedAt
     end
   end
-
-  Job->>Hc: update status, completedAt, metrics component
+  Hj->>Hc: update status, metrics
 ```
 
 On **fatal errors** inside the job, **Healthcheck** is updated to `failure` with whatever **metrics** (phase list) were collected so far. **History** is only created when a past **Meeting** exists, has no **History** yet, and scraping succeeds (see `HKJC_HISTORICAL_SYNC_ENABLED` and related env vars in code).
