@@ -6,6 +6,7 @@
 import { chromium, type Browser, type Page } from 'playwright';
 import * as cheerio from 'cheerio';
 import { format } from 'date-fns';
+import { ensurePlaywrightBrowsersPath } from './playwright-browsers-path';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -57,6 +58,29 @@ export type ScrapedRaceResult = {
   trioDividend?: number;
 };
 
+/** Meeting.races row: same non-result fields as History `race-result`, no dividends or finish rows. */
+export type ScrapedRaceMetadata = {
+  raceId: string;
+  raceDate: string;
+  venue: 'ST' | 'HV';
+  raceNumber: number;
+  raceName?: string;
+  raceClass: string;
+  distance: number;
+  surface: 'Turf' | 'AWT';
+  going:
+    | 'Firm'
+    | 'Good to Firm'
+    | 'Good'
+    | 'Good to Yielding'
+    | 'Yielding'
+    | 'Soft'
+    | 'Heavy'
+    | 'Wet Fast'
+    | 'Wet Slow';
+  prizeMoney: number;
+};
+
 export interface ScraperConfig {
   baseUrl: string;
   rateLimit: number;
@@ -84,6 +108,7 @@ export class HistoricalScraper {
   }
 
   async init(): Promise<void> {
+    ensurePlaywrightBrowsersPath();
     this.browser = await chromium.launch({
       headless: this.config.headless,
     });
@@ -117,6 +142,13 @@ export class HistoricalScraper {
     await sleep(2000);
 
     this.lastRequestTime = Date.now();
+  }
+
+  /** Load URL with rate limiting and return HTML (custom HKJC paths for meeting metadata). */
+  async fetchPage(url: string): Promise<string> {
+    await this.navigateTo(url);
+    if (!this.page) throw new Error('Browser not initialized');
+    return this.page.content();
   }
 
   async scrapeRaceResult(date: Date, venue: Venue, raceNumber: number): Promise<ScrapedRaceResult> {
@@ -481,6 +513,279 @@ export class HistoricalScraper {
     }
 
     return dividends;
+  }
+
+  /**
+   * Non-result race fields for Meeting.races (Strapi meeting.race-metadata).
+   * Fetched from localresults first; if no result rows, from racecard.
+   */
+  async scrapeFullMeetingRaceMetadata(
+    date: Date,
+    venueCode: 'ST' | 'HV'
+  ): Promise<ScrapedRaceMetadata[]> {
+    const out: ScrapedRaceMetadata[] = [];
+    let consecutiveFailures = 0;
+    for (let raceNum = 1; raceNum <= 12; raceNum++) {
+      try {
+        const meta = await this.scrapeRaceMetadataForMeetingSlot(date, venueCode, raceNum);
+        if (!meta) {
+          consecutiveFailures++;
+          if (consecutiveFailures >= 2 && raceNum > 1) break;
+          continue;
+        }
+        consecutiveFailures = 0;
+        out.push(meta);
+      } catch {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 2 && raceNum > 1) break;
+      }
+    }
+    return out;
+  }
+
+  private async scrapeRaceMetadataForMeetingSlot(
+    date: Date,
+    venueCode: 'ST' | 'HV',
+    raceNumber: number
+  ): Promise<ScrapedRaceMetadata | null> {
+    const datePath = format(date, 'yyyy/MM/dd');
+    const base = this.config.baseUrl;
+    const resultsUrl = `${base}/en-us/local/information/localresults?racedate=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
+
+    const htmlResults = await this.fetchPage(resultsUrl);
+    const $r = cheerio.load(htmlResults);
+    const bodyText = $r('body').text();
+
+    const looksEmpty =
+      /No information/i.test(bodyText) &&
+      $r('table').length === 0 &&
+      !/RACE\s*\d+/i.test(bodyText);
+
+    if (looksEmpty) {
+      return this.scrapeRaceMetadataFromRacecardPages(date, venueCode, raceNumber);
+    }
+
+    const finishOrder = this.parseFinishOrder($r);
+    let info: {
+      name?: string;
+      class: RaceClass;
+      distance: number;
+      surface: TrackSurface;
+      going: Going;
+      prizeMoney: number;
+    };
+
+    if (finishOrder.length > 0) {
+      info = this.parseResultRaceInfoLenient($r);
+    } else {
+      return this.scrapeRaceMetadataFromRacecardPages(date, venueCode, raceNumber);
+    }
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return {
+      raceId: `${dateStr}-${venueCode}-${raceNumber}`,
+      raceDate: dateStr,
+      venue: venueCode,
+      raceNumber,
+      raceName: info.name,
+      raceClass: info.class,
+      distance: info.distance,
+      surface: info.surface,
+      going: info.going,
+      prizeMoney: info.prizeMoney,
+    };
+  }
+
+  private async scrapeRaceMetadataFromRacecardPages(
+    date: Date,
+    venueCode: 'ST' | 'HV',
+    raceNumber: number
+  ): Promise<ScrapedRaceMetadata | null> {
+    const datePath = format(date, 'yyyy/MM/dd');
+    const base = this.config.baseUrl;
+    const paramNames = ['RaceDate', 'raceDate'] as const;
+
+    for (const param of paramNames) {
+      const url = `${base}/en-us/local/information/racecard?${param}=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
+      const html = await this.fetchPage(url);
+      const $ = cheerio.load(html);
+      const bodyText = $('body').text();
+      if (/No information/i.test(bodyText) && $('table td').length < 3) {
+        continue;
+      }
+      const info = this.parseRacecardRaceInfo($);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      return {
+        raceId: `${dateStr}-${venueCode}-${raceNumber}`,
+        raceDate: dateStr,
+        venue: venueCode,
+        raceNumber,
+        raceName: info.name,
+        raceClass: info.class,
+        distance: info.distance,
+        surface: info.surface,
+        going: info.going,
+        prizeMoney: info.prizeMoney,
+      };
+    }
+    return null;
+  }
+
+  /** Like parseResultRaceInfo but never throws (defaults going to Good). */
+  private parseResultRaceInfoLenient($: cheerio.CheerioAPI): {
+    name?: string;
+    class: RaceClass;
+    distance: number;
+    surface: TrackSurface;
+    going: Going;
+    prizeMoney: number;
+  } {
+    try {
+      return this.parseResultRaceInfo($);
+    } catch {
+      const pageText = $('body').text();
+      const raceInfoCells = $('table td')
+        .map((_, el) => $(el).text())
+        .get()
+        .join(' ');
+      const allText = `${pageText} ${raceInfoCells}`;
+
+      let raceClass: RaceClass = 'Class 4';
+      const classMatch = allText.match(/Class\s*(\d)/i);
+      if (classMatch) {
+        raceClass = `Class ${classMatch[1]}`;
+      } else if (/Group\s*1/i.test(allText)) {
+        raceClass = 'Group 1';
+      } else if (/Group\s*2/i.test(allText)) {
+        raceClass = 'Group 2';
+      } else if (/Group\s*3/i.test(allText)) {
+        raceClass = 'Group 3';
+      } else if (/Griffin/i.test(allText)) {
+        raceClass = 'Griffin';
+      }
+
+      let distance = 1200;
+      const distanceMatch = allText.match(/(\d{3,4})\s*M(?:\s|$|-)/i);
+      if (distanceMatch) {
+        distance = parseInt(distanceMatch[1]!, 10);
+      }
+
+      let surface: TrackSurface = 'Turf';
+      if (/AWT|All Weather/i.test(allText)) {
+        surface = 'AWT';
+      } else if (/TURF|Turf/i.test(allText)) {
+        surface = 'Turf';
+      }
+
+      let prizeMoney = 0;
+      const prizeMatch = allText.match(/HK\$\s*([\d,]+)/i);
+      if (prizeMatch) {
+        prizeMoney = parseInt(prizeMatch[1]!.replace(/,/g, ''), 10);
+      }
+
+      let name: string | undefined;
+      const nameMatch = allText.match(
+        /(?:RACE\s*\d+[^\n]*\n)?\s*([A-Z][A-Z\s]+HANDICAP|[A-Z][A-Z\s]+CUP|[A-Z][A-Z\s]+TROPHY)/i
+      );
+      if (nameMatch) {
+        name = nameMatch[1]?.trim();
+      }
+
+      return {
+        name,
+        class: raceClass,
+        distance,
+        surface,
+        going: 'Good',
+        prizeMoney,
+      };
+    }
+  }
+
+  /** Lenient race header parse for racecard HTML (reference raceCard.parseRaceInfo). */
+  private parseRacecardRaceInfo($: cheerio.CheerioAPI): {
+    name?: string;
+    class: RaceClass;
+    distance: number;
+    surface: TrackSurface;
+    going: Going;
+    prizeMoney: number;
+  } {
+    const pageText = $('body').text();
+    const raceInfoCells = $('table td')
+      .map((_, el) => $(el).text())
+      .get()
+      .join(' ');
+    const allText = `${pageText} ${raceInfoCells}`;
+
+    let raceClass: RaceClass = 'Class 4';
+    const classMatch = allText.match(/Class\s*(\d)/i);
+    if (classMatch) {
+      raceClass = `Class ${classMatch[1]}`;
+    } else if (/Group\s*1/i.test(allText)) {
+      raceClass = 'Group 1';
+    } else if (/Group\s*2/i.test(allText)) {
+      raceClass = 'Group 2';
+    } else if (/Group\s*3/i.test(allText)) {
+      raceClass = 'Group 3';
+    } else if (/Griffin/i.test(allText)) {
+      raceClass = 'Griffin';
+    }
+
+    let distance = 1200;
+    const distanceMatch =
+      allText.match(/(?:^|[^\d])(\d{4})\s*M(?:\s|$|-)/i) || allText.match(/(\d{4})\s*M[^0-9]/i);
+    if (distanceMatch) {
+      const d = parseInt(distanceMatch[1]!, 10);
+      if (d >= 1000 && d <= 2400) {
+        distance = d;
+      }
+    }
+
+    let surface: TrackSurface = 'Turf';
+    if (/AWT|All Weather/i.test(allText)) {
+      surface = 'AWT';
+    } else if (/TURF|Turf/i.test(allText)) {
+      surface = 'Turf';
+    }
+
+    let going: Going = 'Good';
+    const goingMatch = allText.match(/Going\s*:\s*(\w+(?:\s+to\s+\w+)?)/i);
+    if (goingMatch) {
+      const goingText = goingMatch[1]!.toLowerCase();
+      if (goingText.includes('firm') && goingText.includes('good')) going = 'Good to Firm';
+      else if (goingText.includes('yielding') && goingText.includes('good')) going = 'Good to Yielding';
+      else if (goingText.includes('yielding')) going = 'Yielding';
+      else if (goingText.includes('heavy')) going = 'Heavy';
+      else if (goingText.includes('soft')) going = 'Soft';
+      else if (goingText.includes('firm')) going = 'Firm';
+      else if (goingText.includes('good')) going = 'Good';
+      else if (goingText.includes('wet fast')) going = 'Wet Fast';
+      else if (goingText.includes('wet slow')) going = 'Wet Slow';
+    }
+
+    let prizeMoney = 0;
+    const prizeMatch = allText.match(/HK\$\s*([\d,]+)/i);
+    if (prizeMatch) {
+      prizeMoney = parseInt(prizeMatch[1]!.replace(/,/g, ''), 10);
+    }
+
+    let name: string | undefined;
+    const nameMatch = allText.match(
+      /(?:RACE\s*\d+[^\n]*\n)?\s*([A-Z][A-Z\s]+HANDICAP|[A-Z][A-Z\s]+CUP|[A-Z][A-Z\s]+TROPHY)/i
+    );
+    if (nameMatch) {
+      name = nameMatch[1]?.trim();
+    }
+
+    return {
+      name,
+      class: raceClass,
+      distance,
+      surface,
+      going,
+      prizeMoney,
+    };
   }
 
   private normalizeGoing(goingText: string): Going {

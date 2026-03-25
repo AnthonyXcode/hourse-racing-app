@@ -33,6 +33,18 @@
     "lastScrapedAt": {
       "type": "datetime"
     },
+    "source": {
+      "type": "string",
+      "default": "hkjc"
+    },
+    "raceDetailsScrapedAt": {
+      "type": "datetime"
+    },
+    "races": {
+      "type": "component",
+      "repeatable": true,
+      "component": "meeting.race-metadata"
+    },
     "histories": {
       "type": "relation",
       "relation": "oneToMany",

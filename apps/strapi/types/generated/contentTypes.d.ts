@@ -562,10 +562,13 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    raceDetailsScrapedAt: Schema.Attribute.DateTime;
+    races: Schema.Attribute.Component<'meeting.race-metadata', true>;
     scrapeStatus: Schema.Attribute.Enumeration<
       ['not_started', 'pending', 'success', 'failed', 'partial']
     > &
       Schema.Attribute.DefaultTo<'not_started'>;
+    source: Schema.Attribute.String & Schema.Attribute.DefaultTo<'hkjc'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

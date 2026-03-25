@@ -44,6 +44,20 @@ export interface HealthcheckSyncMetrics extends Struct.ComponentSchema {
         },
         number
       >;
+    meetingsRaceDetailsFailed: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    meetingsRaceDetailsUpdated: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     phases: Schema.Attribute.Component<'healthcheck.job-phase', true>;
   };
 }
@@ -150,6 +164,52 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
   };
 }
 
+export interface MeetingRaceMetadata extends Struct.ComponentSchema {
+  collectionName: 'components_meeting_race_metadatas';
+  info: {
+    description: 'Non-result race fields (same as History race-result minus dividends and finish order)';
+    displayName: 'Race metadata';
+  };
+  attributes: {
+    distance: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    going: Schema.Attribute.Enumeration<
+      [
+        'Firm',
+        'Good to Firm',
+        'Good',
+        'Good to Yielding',
+        'Yielding',
+        'Soft',
+        'Heavy',
+        'Wet Fast',
+        'Wet Slow',
+      ]
+    >;
+    prizeMoney: Schema.Attribute.BigInteger;
+    raceClass: Schema.Attribute.String;
+    raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    raceId: Schema.Attribute.String & Schema.Attribute.Required;
+    raceName: Schema.Attribute.String;
+    raceNumber: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
+    venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
+      Schema.Attribute.Required;
+  };
+}
+
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
@@ -158,6 +218,7 @@ declare module '@strapi/strapi' {
       'history.dividend-amount': HistoryDividendAmount;
       'history.finish-placing': HistoryFinishPlacing;
       'history.race-result': HistoryRaceResult;
+      'meeting.race-metadata': MeetingRaceMetadata;
     }
   }
 }

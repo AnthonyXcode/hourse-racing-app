@@ -1,5 +1,6 @@
 import { chromium, type Browser, type Page } from 'playwright';
 import * as cheerio from 'cheerio';
+import { ensurePlaywrightBrowsersPath } from './playwright-browsers-path';
 import { addDays, format, startOfDay, parse, isAfter } from 'date-fns';
 
 const DEFAULT_BASE = 'https://racing.hkjc.com';
@@ -80,6 +81,7 @@ export class HkjcFixtureFetcher {
   }
 
   async init(): Promise<void> {
+    ensurePlaywrightBrowsersPath();
     this.browser = await chromium.launch({ headless: this.headless });
     this.page = await this.browser.newPage();
     await this.page.setViewportSize({ width: 1280, height: 800 });

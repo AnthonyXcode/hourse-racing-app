@@ -1,0 +1,59 @@
+{
+  "collectionName": "components_meeting_race_metadatas",
+  "info": {
+    "displayName": "Race metadata",
+    "description": "Non-result race fields (same as History race-result minus dividends and finish order)"
+  },
+  "options": {},
+  "attributes": {
+    "raceId": {
+      "type": "string",
+      "required": true
+    },
+    "raceDate": {
+      "type": "date",
+      "required": true
+    },
+    "venue": {
+      "type": "enumeration",
+      "enum": ["ST", "HV"],
+      "required": true
+    },
+    "raceNumber": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "raceName": {
+      "type": "string"
+    },
+    "raceClass": {
+      "type": "string"
+    },
+    "distance": {
+      "type": "integer",
+      "min": 0
+    },
+    "surface": {
+      "type": "enumeration",
+      "enum": ["Turf", "AWT"]
+    },
+    "going": {
+      "type": "enumeration",
+      "enum": [
+        "Firm",
+        "Good to Firm",
+        "Good",
+        "Good to Yielding",
+        "Yielding",
+        "Soft",
+        "Heavy",
+        "Wet Fast",
+        "Wet Slow"
+      ]
+    },
+    "prizeMoney": {
+      "type": "biginteger"
+    }
+  }
+}
