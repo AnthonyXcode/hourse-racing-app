@@ -1,4 +1,5 @@
 import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
+import { syncMissingMeetingHistories } from './hkjc-historical-sync';
 
 type MeetingRow = { date: string; venue: 'ST' | 'HV' };
 type FixtureStore = { season: string; lastUpdated: string; meetings: MeetingRow[] };
@@ -239,6 +240,26 @@ export async function runHkjcDailyJob(strapi: any): Promise<void> {
       meetingsExisting = alreadyHad;
     } else {
       phases.push({ name: 'meetings', status: 'skipped', detail: 'No meetings to sync' });
+    }
+
+    if (meetings.length > 0 && process.env.HKJC_HISTORICAL_SYNC_ENABLED !== 'false') {
+      const hist = await syncMissingMeetingHistories(strapi, meetings);
+      if (hist.pastMeetingsTotal > 0) {
+        const histParts = [
+          `created ${hist.created}`,
+          `failed ${hist.failed}`,
+          `skipped(history) ${hist.skippedHasHistory}`,
+          `skipped(no meeting) ${hist.skippedNoMeeting}`,
+        ];
+        if (hist.capped) histParts.push(`capped at ${hist.attempted} attempts`);
+        const histStatus =
+          hist.failed > 0 && hist.created === 0 ? 'partial' : hist.failed > 0 ? 'partial' : 'success';
+        phases.push({
+          name: 'historical_sync',
+          status: histStatus,
+          detail: histParts.join(', '),
+        });
+      }
     }
 
     const anyFailure = phases.some((p) => p.status === 'failure');

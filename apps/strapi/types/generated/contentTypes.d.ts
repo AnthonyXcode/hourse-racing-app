@@ -522,7 +522,8 @@ export interface ApiHistoryHistory extends Struct.CollectionTypeSchema {
     meeting: Schema.Attribute.Relation<'manyToOne', 'api::meeting.meeting'> &
       Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
-    results: Schema.Attribute.JSON & Schema.Attribute.Required;
+    results: Schema.Attribute.Component<'history.race-result', true> &
+      Schema.Attribute.Required;
     scrapedAt: Schema.Attribute.DateTime;
     source: Schema.Attribute.String & Schema.Attribute.DefaultTo<'hkjc'>;
     updatedAt: Schema.Attribute.DateTime;

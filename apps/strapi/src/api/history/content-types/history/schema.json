@@ -19,7 +19,9 @@
       "required": true
     },
     "results": {
-      "type": "json",
+      "type": "component",
+      "repeatable": true,
+      "component": "history.race-result",
       "required": true
     },
     "scrapedAt": {

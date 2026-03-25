@@ -1,0 +1,14 @@
+{
+  "collectionName": "components_history_dividend_amounts",
+  "info": {
+    "displayName": "Dividend amount",
+    "description": "Single dividend payout (e.g. one place or QPL slot)"
+  },
+  "options": {},
+  "attributes": {
+    "amount": {
+      "type": "decimal",
+      "required": true
+    }
+  }
+}

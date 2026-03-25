@@ -1,0 +1,86 @@
+{
+  "collectionName": "components_history_race_results",
+  "info": {
+    "displayName": "Race result",
+    "description": "Full result for one race at a meeting"
+  },
+  "options": {},
+  "attributes": {
+    "raceId": {
+      "type": "string",
+      "required": true
+    },
+    "raceDate": {
+      "type": "date",
+      "required": true
+    },
+    "venue": {
+      "type": "enumeration",
+      "enum": ["ST", "HV"],
+      "required": true
+    },
+    "raceNumber": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "raceName": {
+      "type": "string"
+    },
+    "raceClass": {
+      "type": "string"
+    },
+    "distance": {
+      "type": "integer",
+      "min": 0
+    },
+    "surface": {
+      "type": "enumeration",
+      "enum": ["Turf", "AWT"]
+    },
+    "going": {
+      "type": "enumeration",
+      "enum": [
+        "Firm",
+        "Good to Firm",
+        "Good",
+        "Good to Yielding",
+        "Yielding",
+        "Soft",
+        "Heavy",
+        "Wet Fast",
+        "Wet Slow"
+      ]
+    },
+    "prizeMoney": {
+      "type": "biginteger"
+    },
+    "finishOrder": {
+      "type": "component",
+      "repeatable": true,
+      "component": "history.finish-placing"
+    },
+    "placeDividends": {
+      "type": "component",
+      "repeatable": true,
+      "component": "history.dividend-amount"
+    },
+    "winDividend": {
+      "type": "decimal"
+    },
+    "quinellaDividend": {
+      "type": "decimal"
+    },
+    "quinellaPlaceDividends": {
+      "type": "component",
+      "repeatable": true,
+      "component": "history.dividend-amount"
+    },
+    "tierceDividend": {
+      "type": "decimal"
+    },
+    "trioDividend": {
+      "type": "decimal"
+    }
+  }
+}

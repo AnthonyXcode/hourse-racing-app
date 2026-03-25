@@ -1,0 +1,41 @@
+{
+  "collectionName": "components_history_finish_placings",
+  "info": {
+    "displayName": "Finish placing",
+    "description": "One horse line in official race results"
+  },
+  "options": {},
+  "attributes": {
+    "horseNumber": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "finishPosition": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "finishTime": {
+      "type": "decimal"
+    },
+    "margin": {
+      "type": "decimal"
+    },
+    "horseName": {
+      "type": "string"
+    },
+    "horseCode": {
+      "type": "string"
+    },
+    "jockeyName": {
+      "type": "string"
+    },
+    "trainerName": {
+      "type": "string"
+    },
+    "winOdds": {
+      "type": "decimal"
+    }
+  }
+}
