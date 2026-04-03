@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { HistoricalScraper } from './hkjc-historical-scraper';
-import type { ScrapedRaceMetadata, ScrapedRaceRunner } from './hkjc-historical-scraper';
+import type { ScrapedRaceMetadata, ScrapedRaceRunner, PastPerformanceEntry } from './hkjc-historical-scraper';
 
 function normalizeHkKey(id: string): string {
   return id.trim().toUpperCase();
@@ -375,4 +375,146 @@ export async function enrichRunnersWithHorseProfiles(
     runner.careerPlaces = profile.careerPlaces;
     runner.totalPrizeMoney = profile.totalPrizeMoney;
   }
+}
+
+/**
+ * For each runner with a `horseCode`, query the History collection in Strapi
+ * to build the pastPerformances array from finish-placing records.
+ *
+ * Results are sorted newest-first, limited to 10 most recent runs.
+ */
+export async function enrichRunnersWithPastPerformances(
+  strapi: any,
+  runners: ScrapedRaceRunner[],
+  raceDate: string
+): Promise<void> {
+  const documents = strapi.documents;
+  if (!documents) return;
+
+  const horseCodes = new Set<string>();
+  for (const r of runners) {
+    if (r.horseCode) horseCodes.add(r.horseCode);
+  }
+  if (horseCodes.size === 0) return;
+
+  const histories = await loadAllHistories(documents);
+  if (histories.length === 0) return;
+
+  const ppByHorseCode = buildPastPerformanceMap(histories, raceDate);
+
+  for (const runner of runners) {
+    if (!runner.horseCode) continue;
+    const pp = ppByHorseCode.get(runner.horseCode);
+    if (pp && pp.length > 0) {
+      runner.pastPerformances = pp;
+    }
+  }
+}
+
+type HistoryRaceResult = {
+  raceDate?: string;
+  venue?: string;
+  raceNumber?: number;
+  raceClass?: string;
+  distance?: number;
+  surface?: string;
+  going?: string;
+  finishOrder?: {
+    horseNumber?: number;
+    horseCode?: string;
+    horseName?: string;
+    jockeyId?: string;
+    finishPosition?: number;
+    finishTime?: number;
+    margin?: number;
+    draw?: number;
+    actualWeight?: number;
+    winOdds?: number;
+  }[];
+};
+
+async function loadAllHistories(documents: any): Promise<HistoryRaceResult[]> {
+  const pageSize = 100;
+  const all: HistoryRaceResult[] = [];
+  let page = 1;
+  for (;;) {
+    const batch = await documents('api::history.history').findMany({
+      pagination: { page, pageSize },
+      populate: {
+        results: {
+          populate: ['finishOrder'],
+        },
+      },
+    });
+    const rows = Array.isArray(batch) ? batch : [];
+    for (const row of rows) {
+      const results = (row as any).results;
+      if (!Array.isArray(results)) continue;
+      for (const r of results) {
+        all.push(r as HistoryRaceResult);
+      }
+    }
+    if (rows.length < pageSize) break;
+    page += 1;
+    if (page > 200) break;
+  }
+  return all;
+}
+
+function venueCodeToName(code: string | undefined): string {
+  if (!code) return '';
+  if (code === 'HV') return 'Happy Valley';
+  if (code === 'ST') return 'Sha Tin';
+  return code;
+}
+
+function buildPastPerformanceMap(
+  races: HistoryRaceResult[],
+  raceDate: string
+): Map<string, PastPerformanceEntry[]> {
+  const map = new Map<string, PastPerformanceEntry[]>();
+
+  for (const race of races) {
+    const rd = typeof race.raceDate === 'string' ? race.raceDate.slice(0, 10) : '';
+    if (!rd || rd >= raceDate) continue;
+
+    const finishOrder = race.finishOrder;
+    if (!Array.isArray(finishOrder) || finishOrder.length === 0) continue;
+    const fieldSize = finishOrder.length;
+
+    const winnerTime = finishOrder.find((f) => f.finishPosition === 1)?.finishTime;
+
+    for (const fo of finishOrder) {
+      const code = fo.horseCode;
+      if (!code) continue;
+
+      const entry: PastPerformanceEntry = {
+        date: new Date(rd).toISOString(),
+        venue: venueCodeToName(race.venue),
+        raceNumber: race.raceNumber ?? 0,
+        finishPosition: fo.finishPosition ?? 0,
+        fieldSize,
+      };
+      if (race.raceClass) entry.raceClass = race.raceClass;
+      if (race.distance) entry.distance = race.distance;
+      if (race.surface) entry.surface = race.surface;
+      if (race.going) entry.going = race.going;
+      if (fo.draw != null) entry.draw = fo.draw;
+      if (fo.actualWeight != null) entry.weight = fo.actualWeight;
+      if (fo.jockeyId) entry.jockeyCode = fo.jockeyId;
+      if (fo.finishTime != null) entry.finishTime = fo.finishTime;
+      if (fo.winOdds != null) entry.odds = fo.winOdds;
+      if (fo.margin != null) entry.winningMargin = fo.margin;
+
+      if (!map.has(code)) map.set(code, []);
+      map.get(code)!.push(entry);
+    }
+  }
+
+  for (const [, entries] of map) {
+    entries.sort((a, b) => b.date.localeCompare(a.date));
+    if (entries.length > 10) entries.length = 10;
+  }
+
+  return map;
 }

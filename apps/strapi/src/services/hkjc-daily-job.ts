@@ -5,6 +5,7 @@ import { syncMissingMeetingHistories } from './hkjc-historical-sync';
 import {
   enrichMeetingRaceMetadatasWithJockeyTrainer,
   enrichRunnersWithHorseProfiles,
+  enrichRunnersWithPastPerformances,
 } from './hkjc-jockey-trainer-sync';
 import { mapScrapedRaceToMeetingPayload } from './meeting-races-mapper';
 import type { ScrapedRaceMetadata } from './hkjc-historical-scraper';
@@ -382,6 +383,7 @@ export async function runHkjcMeetingsJob(
             await enrichMeetingRaceMetadatasWithJockeyTrainer(
               strapi, scraper, [meta], targetDate, jockeyCache, trainerCache
             );
+            await enrichRunnersWithPastPerformances(strapi, meta.runners, targetDate);
 
             const key = raceKey(targetDate, venue, raceNum);
             const payload = mapScrapedRaceToMeetingPayload(meta);

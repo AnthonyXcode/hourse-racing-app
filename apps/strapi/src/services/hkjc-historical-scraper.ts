@@ -102,6 +102,27 @@ export type ScrapedRaceRunner = {
   careerWins?: number;
   careerPlaces?: number;
   totalPrizeMoney?: number;
+
+  /** JSON-serialisable array of past race results for this horse, sourced from History */
+  pastPerformances?: PastPerformanceEntry[];
+};
+
+export type PastPerformanceEntry = {
+  date: string;
+  venue: string;
+  raceNumber: number;
+  raceClass?: string;
+  distance?: number;
+  surface?: string;
+  going?: string;
+  draw?: number;
+  weight?: number;
+  jockeyCode?: string;
+  finishPosition: number;
+  fieldSize: number;
+  winningMargin?: number;
+  finishTime?: number;
+  odds?: number;
 };
 
 /** Meeting.races row: non-result race fields plus runner line-up (no dividends / finish metrics). */
@@ -750,7 +771,7 @@ export class HistoricalScraper {
     return finishOrder;
   }
 
-  /** Strip finish-position, time, margin; keep win odds from local results (Win Odds column). */
+  /** Strip finish-position, time, margin; keep draw, weight, win odds from local results. */
   private finishOrderToRunners(finish: ScrapedRaceResult['finishOrder']): ScrapedRaceRunner[] {
     const rows: ScrapedRaceRunner[] = finish.map((f) => {
       const r: ScrapedRaceRunner = { horseNumber: f.horseNumber };
@@ -760,6 +781,10 @@ export class HistoricalScraper {
       if (f.jockeyId) r.jockeyId = f.jockeyId;
       if (f.trainerName) r.trainerName = f.trainerName;
       if (f.trainerId) r.trainerId = f.trainerId;
+      if (f.draw != null && f.draw >= 1 && f.draw <= 14) r.draw = f.draw;
+      if (f.actualWeight != null && f.actualWeight >= 100 && f.actualWeight <= 140) {
+        r.weight = f.actualWeight;
+      }
       if (f.winOdds != null && Number.isFinite(f.winOdds)) {
         r.winOdds = f.winOdds;
       }
@@ -871,13 +896,13 @@ export class HistoricalScraper {
         }
       }
 
-      // --- Draw: 1-2 digit number in early columns, different from horseNumber ---
+      // --- Draw: 1-2 digit number in a column that is NOT the horse number column (index 0) ---
       let draw: number | undefined;
       for (let i = 1; i < Math.min(cellTexts.length, 8); i++) {
         const t = cellTexts[i]!.trim();
         if (/^\d{1,2}$/.test(t)) {
           const d = parseInt(t, 10);
-          if (d >= 1 && d <= 14 && d !== horseNumber) { draw = d; break; }
+          if (d >= 1 && d <= 14) { draw = d; break; }
         }
       }
 
@@ -1079,6 +1104,9 @@ export class HistoricalScraper {
 
     const dateStr = format(date, 'yyyy-MM-dd');
     const runners = this.finishOrderToRunners(finishOrder);
+
+    await this.mergeRacecardFieldsIntoRunners(date, venueCode, raceNumber, runners);
+
     const meta: ScrapedRaceMetadata = {
       raceId: `${dateStr}-${venueCode}-${raceNumber}`,
       raceDate: dateStr,
@@ -1093,6 +1121,52 @@ export class HistoricalScraper {
       runners,
     };
     return meta;
+  }
+
+  /**
+   * For past races built from localresults, fetch the racecard page and merge
+   * fields that only exist there (gear, age, currentRating, ratingChange).
+   */
+  private async mergeRacecardFieldsIntoRunners(
+    date: Date,
+    venueCode: 'ST' | 'HV',
+    raceNumber: number,
+    runners: ScrapedRaceRunner[]
+  ): Promise<void> {
+    if (runners.length === 0) return;
+
+    const datePath = format(date, 'yyyy/MM/dd');
+    const base = this.config.baseUrl;
+
+    for (const param of ['RaceDate', 'raceDate'] as const) {
+      const url = `${base}/en-us/local/information/racecard?${param}=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
+      try {
+        const html = await this.fetchPage(url);
+        const $ = cheerio.load(html);
+        if (/No information/i.test($('body').text()) && $('table td').length < 3) continue;
+
+        const rcRunners = this.parseRacecardRunners($);
+        if (rcRunners.length === 0) continue;
+
+        const rcMap = new Map<number, ScrapedRaceRunner>();
+        for (const rc of rcRunners) rcMap.set(rc.horseNumber, rc);
+
+        for (const runner of runners) {
+          const rc = rcMap.get(runner.horseNumber);
+          if (!rc) continue;
+          if (rc.gear && rc.gear.length > 0 && !runner.gear) runner.gear = rc.gear;
+          if (rc.age != null && runner.age == null) runner.age = rc.age;
+          if (rc.currentRating != null && runner.currentRating == null) runner.currentRating = rc.currentRating;
+          if (rc.ratingChange != null && runner.ratingChange == null) runner.ratingChange = rc.ratingChange;
+          if (rc.draw != null && runner.draw == null) runner.draw = rc.draw;
+          if (rc.weight != null && runner.weight == null) runner.weight = rc.weight;
+          if (rc.isScratched && !runner.isScratched) runner.isScratched = true;
+        }
+        return;
+      } catch {
+        continue;
+      }
+    }
   }
 
   private async scrapeRaceMetadataFromRacecardPages(

@@ -130,6 +130,10 @@
     "isScratched": {
       "type": "boolean",
       "default": false
+    },
+    "pastPerformances": {
+      "type": "text",
+      "description": "JSON array of past race results for this horse, sourced from History records"
     }
   }
 }

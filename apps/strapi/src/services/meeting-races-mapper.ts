@@ -47,6 +47,10 @@ function mapRunnerToStrapi(runner: ScrapedRaceRunner): Record<string, unknown> {
     o.totalPrizeMoney = String(runner.totalPrizeMoney);
   }
 
+  if (runner.pastPerformances && runner.pastPerformances.length > 0) {
+    o.pastPerformances = JSON.stringify(runner.pastPerformances);
+  }
+
   return o;
 }
 

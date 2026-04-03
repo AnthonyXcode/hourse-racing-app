@@ -261,6 +261,7 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
     jockeyId: Schema.Attribute.String;
     jockeyName: Schema.Attribute.String;
     origin: Schema.Attribute.String;
+    pastPerformances: Schema.Attribute.Text;
     ratingChange: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
