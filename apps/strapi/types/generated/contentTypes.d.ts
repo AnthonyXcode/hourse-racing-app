@@ -430,6 +430,47 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAnalysisAnalysis extends Struct.CollectionTypeSchema {
+  collectionName: 'analyses';
+  info: {
+    displayName: 'Analysis';
+    pluralName: 'analyses';
+    singularName: 'analysis';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    analyzedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::analysis.analysis'
+    > &
+      Schema.Attribute.Private;
+    meeting: Schema.Attribute.Relation<'manyToOne', 'api::meeting.meeting'>;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    publishedAt: Schema.Attribute.DateTime;
+    results: Schema.Attribute.Text & Schema.Attribute.Required;
+    simulationRuns: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<10000>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiFixtureFixture extends Struct.CollectionTypeSchema {
   collectionName: 'fixtures';
   info: {
@@ -1269,6 +1310,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::analysis.analysis': ApiAnalysisAnalysis;
       'api::fixture.fixture': ApiFixtureFixture;
       'api::healthcheck.healthcheck': ApiHealthcheckHealthcheck;
       'api::history.history': ApiHistoryHistory;

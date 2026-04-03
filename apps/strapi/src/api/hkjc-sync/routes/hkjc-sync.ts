@@ -20,6 +20,12 @@ export default {
     },
     {
       method: 'POST',
+      path: '/hkjc-sync/trigger/analysis',
+      handler: 'hkjc-sync.triggerAnalysis',
+      config: { auth: false },
+    },
+    {
+      method: 'POST',
       path: '/hkjc-sync/trigger',
       handler: 'hkjc-sync.trigger',
       config: { auth: false },

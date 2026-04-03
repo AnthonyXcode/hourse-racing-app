@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "analyses",
+  "info": {
+    "singularName": "analysis",
+    "pluralName": "analyses",
+    "displayName": "Analysis"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "Format: yyyy-MM-dd_VV_RN_yyyyMMddHHmmss e.g. 2026-04-06_ST_R1_20260406120000"
+    },
+    "meeting": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::meeting.meeting"
+    },
+    "simulationRuns": {
+      "type": "integer",
+      "default": 10000,
+      "min": 1
+    },
+    "results": {
+      "type": "text",
+      "required": true,
+      "description": "JSON array: [{horseNumber, horseName, horseCode, winProbability, placeProbability, expectedPosition, ranking}]"
+    },
+    "analyzedAt": {
+      "type": "datetime",
+      "required": true
+    }
+  }
+}

@@ -14,7 +14,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "x-generation-date": "2026-04-03T14:14:07.138Z"
+    "x-generation-date": "2026-04-03T15:56:29.821Z"
   },
   "x-strapi-config": {
     "plugins": [
@@ -1757,6 +1757,160 @@
         "summary": "Trigger HKJC history job",
         "description": "For past fixture dates, scrapes HKJC results and creates History when missing (subject to `HKJC_HISTORICAL_SYNC_ENABLED` and caps). Requires `HKJC_SYNC_TRIGGER_SECRET` (min 8 characters). Send the same value in header `x-hkjc-sync-secret` or query `secret`. Returns 503 if the secret is not configured.",
         "operationId": "postHkjcSyncTriggerHistory",
+        "parameters": [
+          {
+            "name": "x-hkjc-sync-secret",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Must match `HKJC_SYNC_TRIGGER_SECRET`."
+          },
+          {
+            "name": "secret",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Alternative to `x-hkjc-sync-secret`; same value as `HKJC_SYNC_TRIGGER_SECRET`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job finished or was skipped because this job type is already running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "started": {
+                      "type": "boolean",
+                      "description": "False when a lock prevented starting a new run."
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "started"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Secret missing or wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Forbidden"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This job type is already running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "This job is already running"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error while running the job or Strapi instance unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "example": false
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "error"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`HKJC_SYNC_TRIGGER_SECRET` unset or shorter than 8 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Manual trigger disabled"
+                    },
+                    "hint": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hkjc-sync/trigger/analysis": {
+      "post": {
+        "tags": [
+          "HKJC"
+        ],
+        "summary": "Trigger race analysis (Monte Carlo)",
+        "description": "Runs Monte Carlo simulation for a meeting (via `meetingKey` query param) or all upcoming races if omitted. Requires `HKJC_SYNC_TRIGGER_SECRET`.",
+        "operationId": "postHkjcSyncTriggerAnalysis",
         "parameters": [
           {
             "name": "x-hkjc-sync-secret",

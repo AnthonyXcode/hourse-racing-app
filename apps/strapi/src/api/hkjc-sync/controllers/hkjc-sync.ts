@@ -2,9 +2,11 @@ import {
   runHkjcFixtureJobOnce,
   runHkjcMeetingsJobOnce,
   runHkjcHistoryJobOnce,
+  runAnalysisJobOnce,
   isHkjcFixtureJobRunning,
   isHkjcMeetingsJobRunning,
   isHkjcHistoryJobRunning,
+  isAnalysisJobRunning,
 } from '../../../services/hkjc-sync-runner';
 import { getAppStrapi } from '../../../services/strapi-instance';
 import type { MeetingsJobOptions } from '../../../services/hkjc-daily-job';
@@ -137,5 +139,15 @@ export default {
 
   async triggerHistory(ctx: any) {
     await runTrigger(ctx, isHkjcHistoryJobRunning, runHkjcHistoryJobOnce);
+  },
+
+  async triggerAnalysis(ctx: any) {
+    const meetingKey =
+      typeof ctx.query?.meetingKey === 'string' && ctx.query.meetingKey.length > 0
+        ? ctx.query.meetingKey
+        : undefined;
+    await runTrigger(ctx, isAnalysisJobRunning, (strapi) =>
+      runAnalysisJobOnce(strapi, meetingKey),
+    );
   },
 };

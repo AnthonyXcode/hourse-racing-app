@@ -4,11 +4,16 @@ import {
   runHkjcHistoryJob,
 } from './hkjc-daily-job';
 import type { MeetingsJobOptions } from './hkjc-daily-job';
+import {
+  runAnalysisForMeeting,
+  runAnalysisForUpcomingRaces,
+} from './race-analysis-job';
 
 const running = {
   fixture: false,
   meetings: false,
   history: false,
+  analysis: false,
 };
 
 export function isHkjcFixtureJobRunning(): boolean {
@@ -56,5 +61,27 @@ export async function runHkjcHistoryJobOnce(strapi: any): Promise<{ started: boo
     return { started: true };
   } finally {
     running.history = false;
+  }
+}
+
+export function isAnalysisJobRunning(): boolean {
+  return running.analysis;
+}
+
+export async function runAnalysisJobOnce(
+  strapi: any,
+  meetingKey?: string,
+): Promise<{ started: boolean }> {
+  if (running.analysis) return { started: false };
+  running.analysis = true;
+  try {
+    if (meetingKey) {
+      await runAnalysisForMeeting(strapi, meetingKey);
+    } else {
+      await runAnalysisForUpcomingRaces(strapi);
+    }
+    return { started: true };
+  } finally {
+    running.analysis = false;
   }
 }

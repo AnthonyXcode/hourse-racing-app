@@ -5,6 +5,7 @@ import {
   runHkjcFixtureJobOnce,
   runHkjcMeetingsJobOnce,
   runHkjcHistoryJobOnce,
+  runAnalysisJobOnce,
 } from './services/hkjc-sync-runner';
 import { setAppStrapi } from './services/strapi-instance';
 
@@ -144,6 +145,13 @@ const hkjcSyncOpenApiOverride = {
         'postHkjcSyncTriggerHistory'
       ),
     },
+    '/hkjc-sync/trigger/analysis': {
+      post: hkjcTriggerPost(
+        'Trigger race analysis (Monte Carlo)',
+        'Runs Monte Carlo simulation for a meeting (via `meetingKey` query param) or all upcoming races if omitted. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
+        'postHkjcSyncTriggerAnalysis'
+      ),
+    },
     '/hkjc-sync/trigger': {
       post: hkjcTriggerPost(
         'Trigger HKJC fixture job (legacy path)',
@@ -199,16 +207,15 @@ export default {
     const scheduleFixture = process.env.HKJC_CRON_FIXTURE_SCHEDULE || '0 6 * * *';
     const scheduleMeetings = process.env.HKJC_CRON_MEETINGS_SCHEDULE || '30 6 * * *';
     const scheduleHistory = process.env.HKJC_CRON_HISTORY_SCHEDULE || '45 6 * * *';
+    const scheduleAnalysis = process.env.HKJC_CRON_ANALYSIS_SCHEDULE || '0 7 * * *';
 
-    // DONE
     scheduleHkjcCron(strapi, 'fixture', scheduleFixture, tz, runHkjcFixtureJobOnce);
-    // IN PROGRESS
     scheduleHkjcCron(strapi, 'meetings', scheduleMeetings, tz, runHkjcMeetingsJobOnce);
-    // DONE
     scheduleHkjcCron(strapi, 'history', scheduleHistory, tz, runHkjcHistoryJobOnce);
+    scheduleHkjcCron(strapi, 'analysis', scheduleAnalysis, tz, (s) => runAnalysisJobOnce(s));
 
     strapi.log.info(
-      `HKJC crons: fixture "${scheduleFixture}", meetings "${scheduleMeetings}", history "${scheduleHistory}" (${tz})`
+      `HKJC crons: fixture "${scheduleFixture}", meetings "${scheduleMeetings}", history "${scheduleHistory}", analysis "${scheduleAnalysis}" (${tz})`
     );
 
     if (process.env.HKJC_CRON_RUN_ON_BOOT === 'true') {
