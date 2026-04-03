@@ -32,7 +32,16 @@ export async function runAnalysisForMeeting(
       name,
       meeting: meetingDocumentId,
       simulationRuns,
-      results: JSON.stringify(results),
+      results: results.map((r) => ({
+        horseNumber: r.horseNumber,
+        horseName: r.horseName,
+        horseCode: r.horseCode,
+        winProbability: r.winProbability,
+        placeProbability: r.placeProbability,
+        expectedPosition: r.expectedPosition,
+        ranking: r.ranking,
+        formRecordCount: r.formRecordCount,
+      })),
       analyzedAt: new Date().toISOString(),
     },
   });

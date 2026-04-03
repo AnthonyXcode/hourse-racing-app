@@ -1,5 +1,66 @@
 import type { Schema, Struct } from '@strapi/strapi';
 
+export interface AnalysisHorseResult extends Struct.ComponentSchema {
+  collectionName: 'components_analysis_horse_results';
+  info: {
+    description: 'Monte Carlo simulation result for a single horse';
+    displayName: 'Horse result';
+  };
+  attributes: {
+    expectedPosition: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    formRecordCount: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    horseCode: Schema.Attribute.String;
+    horseName: Schema.Attribute.String;
+    horseNumber: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    placeProbability: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 1;
+          min: 0;
+        },
+        number
+      >;
+    ranking: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    winProbability: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 1;
+          min: 0;
+        },
+        number
+      >;
+  };
+}
+
 export interface HealthcheckJobPhase extends Struct.ComponentSchema {
   collectionName: 'components_healthcheck_job_phases';
   info: {
@@ -316,6 +377,7 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
+      'analysis.horse-result': AnalysisHorseResult;
       'healthcheck.job-phase': HealthcheckJobPhase;
       'healthcheck.sync-metrics': HealthcheckSyncMetrics;
       'history.dividend-amount': HistoryDividendAmount;

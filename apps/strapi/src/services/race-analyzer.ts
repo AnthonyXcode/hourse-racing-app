@@ -140,6 +140,7 @@ export interface AnalysisResultRow {
   placeProbability: number;
   expectedPosition: number;
   ranking: number;
+  formRecordCount: number;
 }
 
 // ============================================================================
@@ -494,10 +495,14 @@ const MC_STD_DEV = 8;
 function simulateRace(race: Race): AnalysisResultRow[] {
   const analyses = formAnalyzeRace(race);
   const horseMap = new Map<number, HorseAnalysis>();
+  const formCountMap = new Map<number, number>();
   for (const entry of race.entries) {
     if (entry.isScratched) continue;
     const a = analyses.find((x) => x.horseCode === entry.horse.code);
-    if (a) horseMap.set(entry.horseNumber, a);
+    if (a) {
+      horseMap.set(entry.horseNumber, a);
+      formCountMap.set(entry.horseNumber, entry.horse.pastPerformances.length);
+    }
   }
 
   const horseNumbers = Array.from(horseMap.keys());
@@ -540,6 +545,7 @@ function simulateRace(race: Race): AnalysisResultRow[] {
       placeProbability: (placeCounts.get(num) ?? 0) / MC_RUNS,
       expectedPosition: (positionSums.get(num) ?? 0) / MC_RUNS,
       ranking: 0,
+      formRecordCount: formCountMap.get(num) ?? 0,
     });
   }
 

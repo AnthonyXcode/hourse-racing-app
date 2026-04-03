@@ -1,0 +1,51 @@
+{
+  "collectionName": "components_analysis_horse_results",
+  "info": {
+    "displayName": "Horse result",
+    "description": "Monte Carlo simulation result for a single horse"
+  },
+  "options": {},
+  "attributes": {
+    "horseNumber": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "horseName": {
+      "type": "string"
+    },
+    "horseCode": {
+      "type": "string"
+    },
+    "winProbability": {
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "max": 1,
+      "description": "Win probability 0-1"
+    },
+    "placeProbability": {
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "max": 1,
+      "description": "Place (top 3) probability 0-1"
+    },
+    "expectedPosition": {
+      "type": "decimal",
+      "min": 1
+    },
+    "ranking": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "description": "1-based rank by winProbability desc"
+    },
+    "formRecordCount": {
+      "type": "integer",
+      "default": 0,
+      "min": 0,
+      "description": "Number of past performance records used for this horse"
+    }
+  }
+}

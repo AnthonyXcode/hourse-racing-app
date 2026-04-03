@@ -28,9 +28,9 @@
       "min": 1
     },
     "results": {
-      "type": "text",
-      "required": true,
-      "description": "JSON array: [{horseNumber, horseName, horseCode, winProbability, placeProbability, expectedPosition, ranking}]"
+      "type": "component",
+      "repeatable": true,
+      "component": "analysis.horse-result"
     },
     "analyzedAt": {
       "type": "datetime",

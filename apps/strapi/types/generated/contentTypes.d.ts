@@ -456,7 +456,7 @@ export interface ApiAnalysisAnalysis extends Struct.CollectionTypeSchema {
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
     publishedAt: Schema.Attribute.DateTime;
-    results: Schema.Attribute.Text & Schema.Attribute.Required;
+    results: Schema.Attribute.Component<'analysis.horse-result', true>;
     simulationRuns: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

@@ -5,7 +5,7 @@
 
 import { chromium, type Browser, type Page } from 'playwright';
 import * as cheerio from 'cheerio';
-import { format } from 'date-fns';
+import { format, startOfDay, isAfter } from 'date-fns';
 import { ensurePlaywrightBrowsersPath } from './playwright-browsers-path';
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -1069,6 +1069,14 @@ export class HistoricalScraper {
     venueCode: 'ST' | 'HV',
     raceNumber: number
   ): Promise<ScrapedRaceMetadata | null> {
+    // For upcoming races (today or future), localresults silently falls back to
+    // the most recent past meeting — skip it and go straight to the racecard page.
+    const today = startOfDay(new Date());
+    const raceDay = startOfDay(date);
+    if (isAfter(raceDay, today) || raceDay.getTime() === today.getTime()) {
+      return this.scrapeRaceMetadataFromRacecardPages(date, venueCode, raceNumber);
+    }
+
     const datePath = format(date, 'yyyy/MM/dd');
     const base = this.config.baseUrl;
     const resultsUrl = `${base}/en-us/local/information/localresults?RaceDate=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
