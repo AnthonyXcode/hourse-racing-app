@@ -13,24 +13,8 @@ function resolvedVenueFromRows(rows: ScrapedRaceResult[]): 'ST' | 'HV' {
   return v === 'Happy Valley' ? 'HV' : 'ST';
 }
 
-/**
- * Find the first Meeting record for a given date+venue.
- * With per-race keys (e.g. 2025-10-01_ST_R1), we look up by raceDate+venue
- * and prefer the lowest raceNumber (R1).
- */
-async function findMeetingForDateVenue(
-  documents: any,
-  date: string,
-  venue: 'ST' | 'HV'
-): Promise<{ documentId: string } | null> {
-  const row = await documents('api::meeting.meeting').findFirst({
-    filters: {
-      raceDate: { $eq: date },
-      venue: { $eq: venue },
-    },
-    sort: ['raceNumber:asc'],
-  });
-  return row?.documentId ? row : null;
+function historyName(date: string, venue: string): string {
+  return `${date}_${venue}`;
 }
 
 export type HistoricalSyncStats = {
@@ -38,18 +22,16 @@ export type HistoricalSyncStats = {
   attempted: number;
   created: number;
   skippedHasHistory: number;
-  skippedNoMeeting: number;
   failed: number;
   capped: boolean;
 };
 
 /**
- * For past fixture meetings with no History in DB, scrape HKJC local results and create History.
- * Mirrors apps/reference/tools/sync-historical.ts (missing file → scrape) but persists to Strapi.
+ * For past fixture dates with no History in DB, scrape HKJC local results and create History.
  *
  * Env:
  * - HKJC_HISTORICAL_SYNC_ENABLED — set to `false` to skip (default: on)
- * - HKJC_HISTORICAL_MAX_PER_RUN — max meetings (one full result set) per invocation (default: 1, for HTTP trigger timeouts; raise for cron)
+ * - HKJC_HISTORICAL_MAX_PER_RUN — max meetings per invocation (default: unlimited; set to limit long runs)
  * - HKJC_BASE_URL, HKJC_PLAYWRIGHT_HEADLESS, HKJC_RATE_LIMIT_PER_MIN — same as fixture fetch
  */
 export async function syncMissingMeetingHistories(
@@ -61,7 +43,6 @@ export async function syncMissingMeetingHistories(
     attempted: 0,
     created: 0,
     skippedHasHistory: 0,
-    skippedNoMeeting: 0,
     failed: 0,
     capped: false,
   };
@@ -77,7 +58,8 @@ export async function syncMissingMeetingHistories(
     return empty;
   }
 
-  const maxPerRun = Math.max(1, Number(process.env.HKJC_HISTORICAL_MAX_PER_RUN || 1));
+  const maxPerRunEnv = process.env.HKJC_HISTORICAL_MAX_PER_RUN;
+  const maxPerRun = maxPerRunEnv ? Math.max(1, Number(maxPerRunEnv)) : Infinity;
   const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
   const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
   const rateLimit = Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20);
@@ -97,7 +79,6 @@ export async function syncMissingMeetingHistories(
     attempted: 0,
     created: 0,
     skippedHasHistory: 0,
-    skippedNoMeeting: 0,
     failed: 0,
     capped: false,
   };
@@ -117,18 +98,11 @@ export async function syncMissingMeetingHistories(
         break;
       }
 
-      const scheduledMeeting = await findMeetingForDateVenue(documents, m.date, m.venue);
-      if (!scheduledMeeting?.documentId) {
-        stats.skippedNoMeeting++;
-        continue;
-      }
-
-      const hasHistory = await documents('api::history.history').findFirst({
-        filters: {
-          meeting: { documentId: { $eq: scheduledMeeting.documentId } },
-        },
+      const name = historyName(m.date, m.venue);
+      const existing = await documents('api::history.history').findFirst({
+        filters: { name: { $eq: name } },
       });
-      if (hasHistory) {
+      if (existing?.documentId) {
         stats.skippedHasHistory++;
         continue;
       }
@@ -155,38 +129,21 @@ export async function syncMissingMeetingHistories(
       if (!rows?.length) {
         stats.failed++;
         stats.attempted++;
-        try {
-          await documents('api::meeting.meeting').update({
-            documentId: scheduledMeeting.documentId,
-            data: {
-              scrapeStatus: 'failed',
-              lastScrapedAt: new Date().toISOString(),
-            },
-          });
-        } catch {
-          /* ignore */
-        }
         continue;
       }
 
       const resolvedCode = resolvedVenueFromRows(rows);
-      let targetMeeting = scheduledMeeting;
-      if (resolvedCode !== m.venue) {
-        const altMeeting = await findMeetingForDateVenue(documents, m.date, resolvedCode);
-        if (altMeeting?.documentId) {
-          targetMeeting = altMeeting;
-        }
-      }
+      const resolvedName = historyName(m.date, resolvedCode);
 
-      const historyOnTarget = await documents('api::history.history').findFirst({
-        filters: {
-          meeting: { documentId: { $eq: targetMeeting.documentId } },
-        },
-      });
-      if (historyOnTarget) {
-        stats.skippedHasHistory++;
-        stats.attempted++;
-        continue;
+      if (resolvedName !== name) {
+        const existingResolved = await documents('api::history.history').findFirst({
+          filters: { name: { $eq: resolvedName } },
+        });
+        if (existingResolved?.documentId) {
+          stats.skippedHasHistory++;
+          stats.attempted++;
+          continue;
+        }
       }
 
       const resultsPayload = mapJsonRacesToStrapiResults(rows);
@@ -199,25 +156,17 @@ export async function syncMissingMeetingHistories(
       try {
         await documents('api::history.history').create({
           data: {
-            meeting: targetMeeting.documentId,
+            name: resolvedName,
             results: resultsPayload,
             source: 'hkjc',
             scrapedAt: new Date().toISOString(),
           },
         });
 
-        await documents('api::meeting.meeting').update({
-          documentId: targetMeeting.documentId,
-          data: {
-            scrapeStatus: 'success',
-            lastScrapedAt: new Date().toISOString(),
-          },
-        });
-
         stats.created++;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        strapi.log.warn(`hkjc-historical-sync: create history failed for ${m.date}_${m.venue}: ${msg}`);
+        strapi.log.warn(`hkjc-historical-sync: create history failed for ${resolvedName}: ${msg}`);
         stats.failed++;
       }
 
@@ -233,7 +182,7 @@ export async function syncMissingMeetingHistories(
   if (stats.pastMeetingsTotal > 0) {
     strapi.log.info(
       `hkjc-historical-sync: created=${stats.created} failed=${stats.failed} ` +
-        `skipped(history)=${stats.skippedHasHistory} skipped(no meeting)=${stats.skippedNoMeeting} ` +
+        `skipped(history)=${stats.skippedHasHistory} ` +
         `attempted=${stats.attempted} capped=${stats.capped}`
     );
   }

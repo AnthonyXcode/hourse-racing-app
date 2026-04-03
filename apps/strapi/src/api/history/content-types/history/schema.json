@@ -11,12 +11,11 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "meeting": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::meeting.meeting",
-      "inversedBy": "histories",
-      "required": true
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "Format: yyyy-MM-dd_VV e.g. 2025-10-01_ST"
     },
     "results": {
       "type": "component",

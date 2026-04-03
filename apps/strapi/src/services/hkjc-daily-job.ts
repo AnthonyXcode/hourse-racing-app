@@ -521,7 +521,6 @@ export async function runHkjcHistoryJob(strapi: any): Promise<void> {
           `created ${hist.created}`,
           `failed ${hist.failed}`,
           `skipped(history) ${hist.skippedHasHistory}`,
-          `skipped(no meeting) ${hist.skippedNoMeeting}`,
         ];
         if (hist.capped) histParts.push(`capped at ${hist.attempted} attempts`);
         const histStatus =

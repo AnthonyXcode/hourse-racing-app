@@ -522,8 +522,9 @@ export interface ApiHistoryHistory extends Struct.CollectionTypeSchema {
       'api::history.history'
     > &
       Schema.Attribute.Private;
-    meeting: Schema.Attribute.Relation<'manyToOne', 'api::meeting.meeting'> &
-      Schema.Attribute.Required;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
     publishedAt: Schema.Attribute.DateTime;
     results: Schema.Attribute.Component<'history.race-result', true> &
       Schema.Attribute.Required;
@@ -653,7 +654,6 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
         'Wet Slow',
       ]
     >;
-    histories: Schema.Attribute.Relation<'oneToMany', 'api::history.history'>;
     key: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
@@ -671,7 +671,6 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
     raceDetailsScrapedAt: Schema.Attribute.DateTime;
     raceName: Schema.Attribute.String;
     raceNumber: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
         {
           min: 1;

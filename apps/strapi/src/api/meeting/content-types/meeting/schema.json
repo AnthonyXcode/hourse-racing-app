@@ -15,7 +15,7 @@
       "type": "string",
       "required": true,
       "unique": true,
-      "description": "Format: yyyy-MM-dd_VV_RN e.g. 2025-10-01_ST_R1"
+      "description": "Format: yyyy-MM-dd_VV_RN for per-race records (e.g. 2025-10-01_ST_R1) or yyyy-MM-dd_VV for history-only records (e.g. 2025-10-01_ST)"
     },
     "raceDate": {
       "type": "date",
@@ -28,7 +28,6 @@
     },
     "raceNumber": {
       "type": "integer",
-      "required": true,
       "min": 1
     },
     "raceName": {
@@ -81,12 +80,6 @@
     },
     "raceDetailsScrapedAt": {
       "type": "datetime"
-    },
-    "histories": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::history.history",
-      "mappedBy": "meeting"
     }
   }
 }
