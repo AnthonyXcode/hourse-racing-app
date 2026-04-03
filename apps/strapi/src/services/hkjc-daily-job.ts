@@ -189,18 +189,13 @@ export async function runHkjcFixtureJob(strapi: any): Promise<void> {
         detail: 'HKJC_FIXTURE_FETCH_ENABLED=false',
       });
     } else {
-      const daysAhead = Math.min(
-        366,
-        Math.max(1, Number(process.env.HKJC_FIXTURE_FETCH_DAYS || 120))
-      );
       const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
       try {
         const existingSlots = await loadAllFixtureMeetings(documents);
         strapi.log.info(
-          `hkjc-fixture-job: fetching HKJC (${daysAhead}d ahead, ${existingSlots.length} existing slots, headless=${headless})`
+          `hkjc-fixture-job: fetching HKJC fixture calendar (${existingSlots.length} existing slots, headless=${headless})`
         );
         const fetched = await fetchHkjcFixtures({
-          daysAhead,
           headless,
           baseUrl: process.env.HKJC_BASE_URL,
           rateLimitPerMinute: Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20),

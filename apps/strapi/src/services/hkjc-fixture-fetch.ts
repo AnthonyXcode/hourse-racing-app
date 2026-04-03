@@ -1,7 +1,7 @@
 import { chromium, type Browser, type Page } from 'playwright';
 import * as cheerio from 'cheerio';
 import { ensurePlaywrightBrowsersPath } from './playwright-browsers-path';
-import { addDays, format, startOfDay, parse, isAfter } from 'date-fns';
+import { addDays, format, startOfDay, parse } from 'date-fns';
 
 const DEFAULT_BASE = 'https://racing.hkjc.com';
 const DEFAULT_RATE_LIMIT_PER_MIN = 20;
@@ -11,31 +11,21 @@ function sleep(ms: number): Promise<void> {
 }
 
 type FetchOptions = {
-  daysAhead: number;
   headless: boolean;
   baseUrl?: string;
   rateLimitPerMinute?: number;
-  /**
-   * Current fixture meeting slots. HKJC is queried only for calendar days strictly after the
-   * latest `date` here, starting no earlier than today, through `today + daysAhead` (inclusive).
-   */
   existingMeetings?: { date: string; venue: 'ST' | 'HV' }[];
 };
 
 export type FetchedFixture = {
-  /** All slots: existing plus newly discovered (sorted). */
   meetings: { date: string; venue: 'ST' | 'HV' }[];
-  /** New slots found on HKJC this run (subset of `meetings`). */
   discoveredThisRun: { date: string; venue: 'ST' | 'HV' }[];
-  /** Count of new slots (same as `discoveredThisRun.length`). */
   newlyDiscoveredCount: number;
-  /** Calendar days visited on HKJC in this run. */
   scannedDayCount: number;
 };
 
 /**
  * Latest meeting `date` among stored fixture rows (`yyyy-MM-dd` only).
- * Used so HKJC scanning starts the calendar day after this date (see `fetchHkjcFixtures`).
  * ISO date strings sort lexicographically by chronology, so plain string compare is correct.
  */
 function maxFixtureDateIso(rows: { date: string }[]): string | null {
@@ -67,10 +57,6 @@ function mergeFixtureMeetings(
   return { merged, newlyDiscoveredCount };
 }
 
-/**
- * Discover Sha Tin / Happy Valley meetings by scanning HKJC pages (same idea as reference
- * `RaceCardScraper.getRaceMeetings`, with racecard R1 fallback when venue tabs are empty).
- */
 export class HkjcFixtureFetcher {
   private browser: Browser | null = null;
   private page: Page | null = null;
@@ -110,79 +96,85 @@ export class HkjcFixtureFetcher {
     this.lastRequestTime = Date.now();
   }
 
-  private parseVenueTabsFromLocalResults(html: string): { venue: 'ST' | 'HV' }[] {
-    const $ = cheerio.load(html);
-    const seen = new Set<'ST' | 'HV'>();
-    const out: { venue: 'ST' | 'HV' }[] = [];
-    $('.race-meeting-selector a, .venue-tab a').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.includes('Sha Tin') || text.includes('沙田')) {
-        if (!seen.has('ST')) {
-          seen.add('ST');
-          out.push({ venue: 'ST' });
-        }
-      } else if (text.includes('Happy Valley') || text.includes('跑馬地')) {
-        if (!seen.has('HV')) {
-          seen.add('HV');
-          out.push({ venue: 'HV' });
-        }
-      }
-    });
-    return out;
-  }
-
-  private countHorseEntryRows(html: string): number {
-    const $ = cheerio.load(html);
-    let n = 0;
-    $('table tr').each((_, row) => {
-      const $row = $(row);
-      if ($row.find('th').length > 0) return;
-      if ($row.find('td').length < 5) return;
-      if ($row.find('a[href*="horse" i], a[href*="Horse"]').length > 0) n++;
-    });
-    return n;
-  }
-
-  /** Meetings scheduled on this calendar day (0–2 rows: ST and/or HV). */
-  async getMeetingsForDate(date: Date): Promise<{ venue: 'ST' | 'HV' }[]> {
-    const dateStr = format(date, 'yyyy/MM/dd');
-    const resultsUrl = `${this.baseUrl}/en-us/local/information/localresults?RaceDate=${dateStr}`;
-    await this.navigateTo(resultsUrl);
+  /**
+   * Fetch all race meetings for a given month from the HKJC fixture calendar page.
+   * Returns meetings with date (yyyy-MM-dd) and venue (ST/HV).
+   */
+  async getMeetingsForMonth(
+    year: number,
+    month: number
+  ): Promise<{ date: string; venue: 'ST' | 'HV' }[]> {
+    const mm = String(month).padStart(2, '0');
+    const url = `${this.baseUrl}/en-us/local/information/fixture?calyear=${year}&calmonth=${mm}`;
+    await this.navigateTo(url);
     if (!this.page) throw new Error('Browser not initialized');
-    let content = await this.page.content();
-    let fromTabs = this.parseVenueTabsFromLocalResults(content);
-    if (fromTabs.length > 0) return fromTabs;
+    const html = await this.page.content();
+    return this.parseFixtureCalendar(html, year, month);
+  }
 
-    const out: { venue: 'ST' | 'HV' }[] = [];
-    for (const code of ['ST', 'HV'] as const) {
-      const rcUrl = `${this.baseUrl}/en-us/local/information/racecard?raceDate=${dateStr}&Racecourse=${code}&RaceNo=1`;
-      await this.navigateTo(rcUrl);
-      content = await this.page.content();
-      if (this.countHorseEntryRows(content) >= 1) {
-        out.push({ venue: code });
-      }
-    }
-    return out;
+  private parseFixtureCalendar(
+    html: string,
+    year: number,
+    month: number
+  ): { date: string; venue: 'ST' | 'HV' }[] {
+    const $ = cheerio.load(html);
+    const results: { date: string; venue: 'ST' | 'HV' }[] = [];
+
+    $('table td').each((_, td) => {
+      const $td = $(td);
+      const imgs = $td.find('img');
+      if (imgs.length === 0) return;
+
+      const hasST = imgs.toArray().some((img) => {
+        const src = $(img).attr('src') || '';
+        return /\/st\b/i.test(src) || src.includes('st.gif');
+      });
+      const hasHV = imgs.toArray().some((img) => {
+        const src = $(img).attr('src') || '';
+        return /\/hv\b/i.test(src) || src.includes('hv.gif');
+      });
+      if (!hasST && !hasHV) return;
+
+      const text = $td.text().trim();
+      const dayMatch = text.match(/^(\d{1,2})/);
+      if (!dayMatch) return;
+      const day = parseInt(dayMatch[1], 10);
+      if (day < 1 || day > 31) return;
+
+      const mm = String(month).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      const dateStr = `${year}-${mm}-${dd}`;
+
+      if (hasST) results.push({ date: dateStr, venue: 'ST' });
+      if (hasHV) results.push({ date: dateStr, venue: 'HV' });
+    });
+
+    return results;
   }
 }
 
 /**
- * Scan HKJC for race days from the first calendar day after the latest stored fixture date
- * (but not before today) through `today + daysAhead` inclusive, then merge with `existingMeetings`.
- * First run (no existing rows) scans [today, today + daysAhead] as before.
+ * Scan HKJC fixture calendar from the month of the last stored fixture date
+ * through next month (to capture the soonest upcoming race day), then merge
+ * with `existingMeetings`.
+ * Only meetings strictly after the last stored fixture date are treated as discovered.
  */
 export async function fetchHkjcFixtures(options: FetchOptions): Promise<FetchedFixture> {
   const existing = options.existingMeetings ?? [];
   const today = startOfDay(new Date());
-  const windowEnd = startOfDay(addDays(today, options.daysAhead));
 
-  let scanStart = today;
+  let scanStartDate = today;
   const maxIso = maxFixtureDateIso(existing);
   if (maxIso) {
-    const maxDay = startOfDay(parse(maxIso, 'yyyy-MM-dd', new Date()));
-    const dayAfterLast = addDays(maxDay, 1);
-    scanStart = isAfter(dayAfterLast, today) ? dayAfterLast : today;
+    const dayAfterLast = addDays(startOfDay(parse(maxIso, 'yyyy-MM-dd', new Date())), 1);
+    scanStartDate = dayAfterLast;
   }
+
+  const startYear = scanStartDate.getFullYear();
+  const startMonth = scanStartDate.getMonth() + 1;
+  const nextMonth = addDays(new Date(today.getFullYear(), today.getMonth() + 1, 1), 0);
+  const endYear = nextMonth.getFullYear();
+  const endMonth = nextMonth.getMonth() + 1;
 
   const fetcher = new HkjcFixtureFetcher({
     headless: options.headless,
@@ -190,26 +182,21 @@ export async function fetchHkjcFixtures(options: FetchOptions): Promise<FetchedF
     rateLimitPerMinute: options.rateLimitPerMinute,
   });
   await fetcher.init();
-  const discovered: { date: string; venue: 'ST' | 'HV' }[] = [];
-  const seenInScan = new Set<string>();
-  let scannedDayCount = 0;
+
+  const allFromCalendar: { date: string; venue: 'ST' | 'HV' }[] = [];
+  let scannedMonthCount = 0;
 
   try {
-    if (!isAfter(scanStart, windowEnd)) {
-      for (let d = scanStart; !isAfter(d, windowEnd); d = addDays(d, 1)) {
-        scannedDayCount++;
+    for (let y = startYear; y <= endYear; y++) {
+      const mStart = y === startYear ? startMonth : 1;
+      const mEnd = y === endYear ? endMonth : 12;
+      for (let m = mStart; m <= mEnd; m++) {
+        scannedMonthCount++;
         try {
-          const dayMeetings = await fetcher.getMeetingsForDate(d);
-          const ds = format(d, 'yyyy-MM-dd');
-          for (const m of dayMeetings) {
-            const k = `${ds}_${m.venue}`;
-            if (!seenInScan.has(k)) {
-              seenInScan.add(k);
-              discovered.push({ date: ds, venue: m.venue });
-            }
-          }
+          const meetings = await fetcher.getMeetingsForMonth(y, m);
+          allFromCalendar.push(...meetings);
         } catch {
-          // No meeting or transient error for this date
+          // transient error for this month
         }
       }
     }
@@ -217,12 +204,31 @@ export async function fetchHkjcFixtures(options: FetchOptions): Promise<FetchedF
     await fetcher.close();
   }
 
+  const scanStartIso = format(scanStartDate, 'yyyy-MM-dd');
+  const todayIso = format(today, 'yyyy-MM-dd');
+
+  const pastAndToday = allFromCalendar.filter(
+    (m) => m.date >= scanStartIso && m.date <= todayIso
+  );
+
+  const futureDates = allFromCalendar
+    .filter((m) => m.date > todayIso && m.date >= scanStartIso)
+    .map((m) => m.date);
+  const soonestDate = futureDates.length > 0
+    ? futureDates.sort()[0]
+    : null;
+  const soonestMeetings = soonestDate
+    ? allFromCalendar.filter((m) => m.date === soonestDate)
+    : [];
+
+  const discovered = [...pastAndToday, ...soonestMeetings];
+
   const { merged, newlyDiscoveredCount } = mergeFixtureMeetings(existing, discovered);
 
   return {
     meetings: merged,
     discoveredThisRun: discovered,
     newlyDiscoveredCount,
-    scannedDayCount,
+    scannedDayCount: scannedMonthCount,
   };
 }
