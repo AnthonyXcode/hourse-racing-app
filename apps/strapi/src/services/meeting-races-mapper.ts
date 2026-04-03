@@ -47,26 +47,6 @@ function mapRunnerToStrapi(runner: ScrapedRaceRunner): Record<string, unknown> {
     o.totalPrizeMoney = String(runner.totalPrizeMoney);
   }
 
-  // jockey stats snapshot
-  if (runner.jockeyNationality) o.jockeyNationality = runner.jockeyNationality;
-  if (runner.jockeyWins != null) o.jockeyWins = runner.jockeyWins;
-  if (runner.jockeySeconds != null) o.jockeySeconds = runner.jockeySeconds;
-  if (runner.jockeyThirds != null) o.jockeyThirds = runner.jockeyThirds;
-  if (runner.jockeyFourths != null) o.jockeyFourths = runner.jockeyFourths;
-  if (runner.jockeyTotalRides != null) o.jockeyTotalRides = runner.jockeyTotalRides;
-  if (runner.jockeyWinPercent != null) o.jockeyWinPercent = runner.jockeyWinPercent;
-  if (runner.jockeyStakesWon != null && runner.jockeyStakesWon > 0) {
-    o.jockeyStakesWon = String(runner.jockeyStakesWon);
-  }
-  if (runner.jockeyWinsLast10Days != null) o.jockeyWinsLast10Days = runner.jockeyWinsLast10Days;
-
-  // trainer stats snapshot
-  if (runner.trainerWins != null) o.trainerWins = runner.trainerWins;
-  if (runner.trainerSeconds != null) o.trainerSeconds = runner.trainerSeconds;
-  if (runner.trainerThirds != null) o.trainerThirds = runner.trainerThirds;
-  if (runner.trainerTotalRunners != null) o.trainerTotalRunners = runner.trainerTotalRunners;
-  if (runner.trainerWinPercent != null) o.trainerWinPercent = runner.trainerWinPercent;
-
   return o;
 }
 

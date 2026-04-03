@@ -380,7 +380,7 @@ export async function runHkjcMeetingsJob(
 
             await enrichRunnersWithHorseProfiles(scraper, meta.runners, horseProfileCache);
             await enrichMeetingRaceMetadatasWithJockeyTrainer(
-              strapi, scraper, [meta], jockeyCache, trainerCache
+              strapi, scraper, [meta], targetDate, jockeyCache, trainerCache
             );
 
             const key = raceKey(targetDate, venue, raceNum);

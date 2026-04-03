@@ -2,23 +2,6 @@ import * as cheerio from 'cheerio';
 import type { HistoricalScraper } from './hkjc-historical-scraper';
 import type { ScrapedRaceMetadata, ScrapedRaceRunner } from './hkjc-historical-scraper';
 
-function personStatsStaleMs(): number {
-  const hours = Math.max(1, Number(process.env.HKJC_PERSON_STATS_STALE_HOURS || 48));
-  return hours * 60 * 60 * 1000;
-}
-
-function needsStatsRefresh(lastSynced: unknown): boolean {
-  if (lastSynced == null) return true;
-  const t =
-    lastSynced instanceof Date
-      ? lastSynced.getTime()
-      : typeof lastSynced === 'string'
-        ? Date.parse(lastSynced)
-        : NaN;
-  if (Number.isNaN(t)) return true;
-  return Date.now() - t > personStatsStaleMs();
-}
-
 function normalizeHkKey(id: string): string {
   return id.trim().toUpperCase();
 }
@@ -122,7 +105,7 @@ export function parseTrainerProfileHtml(html: string, code: string): {
   };
 }
 
-type JockeyCacheEntry = {
+export type JockeyCacheEntry = {
   documentId: string;
   nationality?: string;
   wins: number;
@@ -135,7 +118,7 @@ type JockeyCacheEntry = {
   winsLast10Days: number;
 } | null;
 
-type TrainerCacheEntry = {
+export type TrainerCacheEntry = {
   documentId: string;
   wins: number;
   seconds: number;
@@ -172,155 +155,143 @@ function trainerEntryFromRow(row: any): TrainerCacheEntry {
   };
 }
 
+/**
+ * Find or create a date-keyed Jockey snapshot.
+ * Key format: JOCKEYID_yyyy-MM-dd — if the record already exists we skip the HKJC fetch.
+ */
 async function ensureJockey(
   strapi: any,
   scraper: HistoricalScraper,
   hkId: string,
+  snapshotDate: string,
   fallbackName: string | undefined,
   baseUrl: string
 ): Promise<JockeyCacheEntry> {
   const documents = strapi.documents;
   if (!documents) return null;
 
-  const key = normalizeHkKey(hkId);
+  const code = normalizeHkKey(hkId);
+  const key = `${code}_${snapshotDate}`;
+
   const existing = await documents('api::jockey.jockey').findFirst({
     filters: { key: { $eq: key } },
   });
-
-  const syncedAt = existing?.lastStatsSyncedAt;
-  if (existing?.documentId && !needsStatsRefresh(syncedAt)) {
+  if (existing?.documentId) {
     return jockeyEntryFromRow(existing);
   }
 
-  const url = `${baseUrl}/en-us/local/information/jockeywinstat?JockeyId=${encodeURIComponent(key)}`;
+  const url = `${baseUrl}/en-us/local/information/jockeywinstat?JockeyId=${encodeURIComponent(code)}`;
   let parsed: ReturnType<typeof parseJockeyWinStatHtml> = null;
   try {
     const html = await scraper.fetchPage(url);
-    parsed = parseJockeyWinStatHtml(html, key);
+    parsed = parseJockeyWinStatHtml(html, code);
   } catch (e) {
     strapi.log.warn(
       `hkjc-person-sync: jockey fetch failed ${key}: ${e instanceof Error ? e.message : String(e)}`
     );
   }
 
-  const now = new Date().toISOString();
-  const displayName = parsed?.name || existing?.displayName || fallbackName || key;
+  if (!parsed) return null;
 
   const data: Record<string, unknown> = {
     key,
-    displayName,
+    jockeyCode: code,
+    snapshotDate,
+    displayName: parsed.name || fallbackName || code,
+    nationality: parsed.nationality,
+    wins: parsed.wins,
+    seconds: parsed.seconds,
+    thirds: parsed.thirds,
+    fourths: parsed.fourths,
+    totalRides: parsed.totalRides,
+    winPercent: parsed.winPercent,
+    stakesWon: parsed.stakesWon,
+    winsLast10Days: parsed.winsLast10Days,
   };
 
-  if (parsed) {
-    data.lastStatsSyncedAt = now;
-    data.nationality = parsed.nationality;
-    data.wins = parsed.wins;
-    data.seconds = parsed.seconds;
-    data.thirds = parsed.thirds;
-    data.fourths = parsed.fourths;
-    data.totalRides = parsed.totalRides;
-    data.winPercent = parsed.winPercent;
-    data.stakesWon = parsed.stakesWon;
-    data.winsLast10Days = parsed.winsLast10Days;
-  } else if (existing) {
-    return jockeyEntryFromRow(existing);
-  }
-
   try {
-    if (existing?.documentId) {
-      await documents('api::jockey.jockey').update({
-        documentId: existing.documentId,
-        data,
-      });
-      return jockeyEntryFromRow({ ...existing, ...data });
-    }
     const created = await documents('api::jockey.jockey').create({ data });
     return jockeyEntryFromRow(created);
   } catch (e) {
     strapi.log.warn(
-      `hkjc-person-sync: jockey upsert failed ${key}: ${e instanceof Error ? e.message : String(e)}`
-    );
-    return null;
-  }
-}
-
-async function ensureTrainer(
-  strapi: any,
-  scraper: HistoricalScraper,
-  hkId: string,
-  fallbackName: string | undefined,
-  baseUrl: string
-): Promise<TrainerCacheEntry> {
-  const documents = strapi.documents;
-  if (!documents) return null;
-
-  const key = normalizeHkKey(hkId);
-  const existing = await documents('api::trainer.trainer').findFirst({
-    filters: { key: { $eq: key } },
-  });
-
-  const syncedAt = existing?.lastStatsSyncedAt;
-  if (existing?.documentId && !needsStatsRefresh(syncedAt)) {
-    return trainerEntryFromRow(existing);
-  }
-
-  const url = `${baseUrl}/en-us/local/information/trainerprofile?trainerid=${encodeURIComponent(key)}`;
-  let parsed: ReturnType<typeof parseTrainerProfileHtml> = null;
-  try {
-    const html = await scraper.fetchPage(url);
-    parsed = parseTrainerProfileHtml(html, key);
-  } catch (e) {
-    strapi.log.warn(
-      `hkjc-person-sync: trainer fetch failed ${key}: ${e instanceof Error ? e.message : String(e)}`
-    );
-  }
-
-  const now = new Date().toISOString();
-  const displayName = parsed?.name || existing?.displayName || fallbackName || key;
-
-  const data: Record<string, unknown> = {
-    key,
-    displayName,
-  };
-
-  if (parsed) {
-    data.lastStatsSyncedAt = now;
-    data.wins = parsed.wins;
-    data.seconds = parsed.seconds;
-    data.thirds = parsed.thirds;
-    data.totalRunners = parsed.totalRunners;
-    data.winPercent = parsed.winPercent;
-  } else if (existing) {
-    return trainerEntryFromRow(existing);
-  }
-
-  try {
-    if (existing?.documentId) {
-      await documents('api::trainer.trainer').update({
-        documentId: existing.documentId,
-        data,
-      });
-      return trainerEntryFromRow({ ...existing, ...data });
-    }
-    const created = await documents('api::trainer.trainer').create({ data });
-    return trainerEntryFromRow(created);
-  } catch (e) {
-    strapi.log.warn(
-      `hkjc-person-sync: trainer upsert failed ${key}: ${e instanceof Error ? e.message : String(e)}`
+      `hkjc-person-sync: jockey create failed ${key}: ${e instanceof Error ? e.message : String(e)}`
     );
     return null;
   }
 }
 
 /**
- * For each runner in meeting race metadata, link Strapi Jockey / Trainer, refresh HKJC stats
- * when `lastStatsSyncedAt` is older than HKJC_PERSON_STATS_STALE_HOURS (default 48),
- * and snapshot the current jockey/trainer stats onto the runner.
+ * Find or create a date-keyed Trainer snapshot.
+ * Key format: TRAINERID_yyyy-MM-dd — if the record already exists we skip the HKJC fetch.
+ */
+async function ensureTrainer(
+  strapi: any,
+  scraper: HistoricalScraper,
+  hkId: string,
+  snapshotDate: string,
+  fallbackName: string | undefined,
+  baseUrl: string
+): Promise<TrainerCacheEntry> {
+  const documents = strapi.documents;
+  if (!documents) return null;
+
+  const code = normalizeHkKey(hkId);
+  const key = `${code}_${snapshotDate}`;
+
+  const existing = await documents('api::trainer.trainer').findFirst({
+    filters: { key: { $eq: key } },
+  });
+  if (existing?.documentId) {
+    return trainerEntryFromRow(existing);
+  }
+
+  const url = `${baseUrl}/en-us/local/information/trainerprofile?trainerid=${encodeURIComponent(code)}`;
+  let parsed: ReturnType<typeof parseTrainerProfileHtml> = null;
+  try {
+    const html = await scraper.fetchPage(url);
+    parsed = parseTrainerProfileHtml(html, code);
+  } catch (e) {
+    strapi.log.warn(
+      `hkjc-person-sync: trainer fetch failed ${key}: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+
+  if (!parsed) return null;
+
+  const data: Record<string, unknown> = {
+    key,
+    trainerCode: code,
+    snapshotDate,
+    displayName: parsed.name || fallbackName || code,
+    wins: parsed.wins,
+    seconds: parsed.seconds,
+    thirds: parsed.thirds,
+    totalRunners: parsed.totalRunners,
+    winPercent: parsed.winPercent,
+  };
+
+  try {
+    const created = await documents('api::trainer.trainer').create({ data });
+    return trainerEntryFromRow(created);
+  } catch (e) {
+    strapi.log.warn(
+      `hkjc-person-sync: trainer create failed ${key}: ${e instanceof Error ? e.message : String(e)}`
+    );
+    return null;
+  }
+}
+
+/**
+ * For each runner in race metadata, find or create date-keyed Jockey / Trainer snapshots
+ * and set the documentId on the runner so the mapper can create the relation link.
+ *
+ * @param snapshotDate — yyyy-MM-dd date used as part of the jockey/trainer record key
  */
 export async function enrichMeetingRaceMetadatasWithJockeyTrainer(
   strapi: any,
   scraper: HistoricalScraper,
   metadatas: ScrapedRaceMetadata[],
+  snapshotDate: string,
   jockeyCache?: Map<string, JockeyCacheEntry>,
   trainerCache?: Map<string, TrainerCacheEntry>
 ): Promise<void> {
@@ -336,37 +307,25 @@ export async function enrichMeetingRaceMetadatasWithJockeyTrainer(
   for (const meta of metadatas) {
     for (const runner of meta.runners) {
       if (runner.jockeyId) {
-        const k = normalizeHkKey(runner.jockeyId);
-        if (!jCache.has(k)) {
-          jCache.set(k, await ensureJockey(strapi, scraper, k, runner.jockeyName, baseUrl));
+        const code = normalizeHkKey(runner.jockeyId);
+        const cacheKey = `${code}_${snapshotDate}`;
+        if (!jCache.has(cacheKey)) {
+          jCache.set(cacheKey, await ensureJockey(strapi, scraper, code, snapshotDate, runner.jockeyName, baseUrl));
         }
-        const entry = jCache.get(k);
+        const entry = jCache.get(cacheKey);
         if (entry) {
           runner.jockeyDocumentId = entry.documentId;
-          runner.jockeyNationality = entry.nationality;
-          runner.jockeyWins = entry.wins;
-          runner.jockeySeconds = entry.seconds;
-          runner.jockeyThirds = entry.thirds;
-          runner.jockeyFourths = entry.fourths;
-          runner.jockeyTotalRides = entry.totalRides;
-          runner.jockeyWinPercent = entry.winPercent;
-          runner.jockeyStakesWon = entry.stakesWon;
-          runner.jockeyWinsLast10Days = entry.winsLast10Days;
         }
       }
       if (runner.trainerId) {
-        const k = normalizeHkKey(runner.trainerId);
-        if (!tCache.has(k)) {
-          tCache.set(k, await ensureTrainer(strapi, scraper, k, runner.trainerName, baseUrl));
+        const code = normalizeHkKey(runner.trainerId);
+        const cacheKey = `${code}_${snapshotDate}`;
+        if (!tCache.has(cacheKey)) {
+          tCache.set(cacheKey, await ensureTrainer(strapi, scraper, code, snapshotDate, runner.trainerName, baseUrl));
         }
-        const entry = tCache.get(k);
+        const entry = tCache.get(cacheKey);
         if (entry) {
           runner.trainerDocumentId = entry.documentId;
-          runner.trainerWins = entry.wins;
-          runner.trainerSeconds = entry.seconds;
-          runner.trainerThirds = entry.thirds;
-          runner.trainerTotalRunners = entry.totalRunners;
-          runner.trainerWinPercent = entry.winPercent;
         }
       }
     }

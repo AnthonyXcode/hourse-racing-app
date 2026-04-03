@@ -191,7 +191,7 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
 export interface MeetingRaceRunner extends Struct.ComponentSchema {
   collectionName: 'components_meeting_race_runners';
   info: {
-    description: 'Full racecard entry: horse identity, jockey/trainer, racecard-table fields (draw, weight, age, rating, gear) and horse-profile fields (sex, color, origin, career stats).';
+    description: 'Full racecard entry: horse identity, jockey/trainer (via relation), racecard-table fields (draw, weight, age, rating, gear) and horse-profile fields (sex, color, origin, career stats).';
     displayName: 'Race runner';
   };
   attributes: {
@@ -258,60 +258,8 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
       >;
     isScratched: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     jockey: Schema.Attribute.Relation<'manyToOne', 'api::jockey.jockey'>;
-    jockeyFourths: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
     jockeyId: Schema.Attribute.String;
     jockeyName: Schema.Attribute.String;
-    jockeyNationality: Schema.Attribute.String;
-    jockeySeconds: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    jockeyStakesWon: Schema.Attribute.BigInteger &
-      Schema.Attribute.DefaultTo<'0'>;
-    jockeyThirds: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    jockeyTotalRides: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    jockeyWinPercent: Schema.Attribute.Decimal;
-    jockeyWins: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    jockeyWinsLast10Days: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
     origin: Schema.Attribute.String;
     ratingChange: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
@@ -352,39 +300,6 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
     trainer: Schema.Attribute.Relation<'manyToOne', 'api::trainer.trainer'>;
     trainerId: Schema.Attribute.String;
     trainerName: Schema.Attribute.String;
-    trainerSeconds: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    trainerThirds: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    trainerTotalRunners: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
-    trainerWinPercent: Schema.Attribute.Decimal;
-    trainerWins: Schema.Attribute.Integer &
-      Schema.Attribute.SetMinMax<
-        {
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
     weight: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

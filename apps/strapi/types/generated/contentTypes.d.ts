@@ -558,10 +558,10 @@ export interface ApiJockeyJockey extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+    jockeyCode: Schema.Attribute.String & Schema.Attribute.Required;
     key: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
-    lastStatsSyncedAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -578,6 +578,7 @@ export interface ApiJockeyJockey extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+    snapshotDate: Schema.Attribute.Date & Schema.Attribute.Required;
     stakesWon: Schema.Attribute.BigInteger & Schema.Attribute.DefaultTo<0>;
     thirds: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
@@ -710,7 +711,6 @@ export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
     key: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
-    lastStatsSyncedAt: Schema.Attribute.DateTime;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -726,6 +726,7 @@ export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+    snapshotDate: Schema.Attribute.Date & Schema.Attribute.Required;
     thirds: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
@@ -742,6 +743,7 @@ export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+    trainerCode: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

@@ -102,24 +102,6 @@ export type ScrapedRaceRunner = {
   careerWins?: number;
   careerPlaces?: number;
   totalPrizeMoney?: number;
-
-  // --- jockey stats snapshot (frozen at scrape time) ---
-  jockeyNationality?: string;
-  jockeyWins?: number;
-  jockeySeconds?: number;
-  jockeyThirds?: number;
-  jockeyFourths?: number;
-  jockeyTotalRides?: number;
-  jockeyWinPercent?: number;
-  jockeyStakesWon?: number;
-  jockeyWinsLast10Days?: number;
-
-  // --- trainer stats snapshot (frozen at scrape time) ---
-  trainerWins?: number;
-  trainerSeconds?: number;
-  trainerThirds?: number;
-  trainerTotalRunners?: number;
-  trainerWinPercent?: number;
 };
 
 /** Meeting.races row: non-result race fields plus runner line-up (no dividends / finish metrics). */

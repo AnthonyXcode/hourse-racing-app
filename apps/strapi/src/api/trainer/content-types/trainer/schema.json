@@ -14,7 +14,18 @@
     "key": {
       "type": "string",
       "required": true,
-      "unique": true
+      "unique": true,
+      "description": "Format: TRAINERID_yyyy-MM-dd e.g. SizeA_2026-04-01"
+    },
+    "trainerCode": {
+      "type": "string",
+      "required": true,
+      "description": "HKJC trainer ID e.g. SizeA"
+    },
+    "snapshotDate": {
+      "type": "date",
+      "required": true,
+      "description": "The race date this snapshot was taken for"
     },
     "displayName": {
       "type": "string",
@@ -42,9 +53,6 @@
     },
     "winPercent": {
       "type": "decimal"
-    },
-    "lastStatsSyncedAt": {
-      "type": "datetime"
     }
   }
 }
