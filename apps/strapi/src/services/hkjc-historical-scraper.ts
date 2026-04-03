@@ -76,6 +76,50 @@ export type ScrapedRaceRunner = {
   jockeyDocumentId?: string;
   /** Strapi `api::trainer.trainer` documentId after person sync */
   trainerDocumentId?: string;
+
+  // --- racecard-table fields ---
+  draw?: number;
+  /** Declared weight (lbs) for this race */
+  weight?: number;
+  age?: number;
+  currentRating?: number;
+  ratingChange?: number;
+  /** Gear codes parsed from racecard row text, e.g. ["B","P","XB"] */
+  gear?: string[];
+  isScratched?: boolean;
+
+  // --- horse-profile fields ---
+  sex?: 'G' | 'H' | 'M' | 'R';
+  color?: string;
+  /** Country code: AUS, NZ, IRE, GB, USA, JPN, FR, GER, ARG, etc. */
+  origin?: string;
+  sire?: string;
+  dam?: string;
+  seasonStarts?: number;
+  seasonWins?: number;
+  seasonPlaces?: number;
+  careerStarts?: number;
+  careerWins?: number;
+  careerPlaces?: number;
+  totalPrizeMoney?: number;
+
+  // --- jockey stats snapshot (frozen at scrape time) ---
+  jockeyNationality?: string;
+  jockeyWins?: number;
+  jockeySeconds?: number;
+  jockeyThirds?: number;
+  jockeyFourths?: number;
+  jockeyTotalRides?: number;
+  jockeyWinPercent?: number;
+  jockeyStakesWon?: number;
+  jockeyWinsLast10Days?: number;
+
+  // --- trainer stats snapshot (frozen at scrape time) ---
+  trainerWins?: number;
+  trainerSeconds?: number;
+  trainerThirds?: number;
+  trainerTotalRunners?: number;
+  trainerWinPercent?: number;
 };
 
 /** Meeting.races row: non-result race fields plus runner line-up (no dividends / finish metrics). */
@@ -230,6 +274,121 @@ export class HistoricalScraper {
     }
     if (!this.page) throw new Error('Browser not initialized');
     return this.page.content();
+  }
+
+  // -----------------------------------------------------------------------
+  // Horse profile scraping (ported from reference horseProfile.ts)
+  // -----------------------------------------------------------------------
+
+  /** Parsed subset of the HKJC horse profile page. */
+  static parseHorseProfileHtml(html: string): {
+    sex: 'G' | 'H' | 'M' | 'R';
+    color: string;
+    origin: string;
+    sire: string;
+    dam: string;
+    age: number;
+    currentRating: number;
+    seasonStarts: number;
+    seasonWins: number;
+    seasonPlaces: number;
+    careerStarts: number;
+    careerWins: number;
+    careerPlaces: number;
+    totalPrizeMoney: number;
+  } | null {
+    const $ = cheerio.load(html);
+    const pageText = $('body').text();
+    const allText = $('table').text() + ' ' + pageText;
+
+    if (/No information/i.test(pageText) && $('table td').length < 3) return null;
+
+    let sex: 'G' | 'H' | 'M' | 'R' = 'G';
+    if (/\bGelding\b/i.test(allText)) sex = 'G';
+    else if (/\bHorse\b|\bStallion\b|\bColt\b/i.test(allText)) sex = 'H';
+    else if (/\bMare\b|\bFilly\b/i.test(allText)) sex = 'M';
+    else if (/\bRig\b/i.test(allText)) sex = 'R';
+
+    let color = 'Bay';
+    for (const c of ['Bay', 'Brown', 'Chestnut', 'Grey', 'Black']) {
+      if (allText.toLowerCase().includes(c.toLowerCase())) { color = c; break; }
+    }
+
+    let origin = 'AUS';
+    const origins: Record<string, string> = {
+      Australia: 'AUS', 'New Zealand': 'NZ', Ireland: 'IRE',
+      'Great Britain': 'GB', USA: 'USA', Japan: 'JPN',
+      France: 'FR', Germany: 'GER', Argentina: 'ARG',
+    };
+    for (const [country, code] of Object.entries(origins)) {
+      if (allText.includes(country)) { origin = code; break; }
+    }
+
+    let sire = '';
+    let dam = '';
+    const sireMatch = allText.match(/Sire[:\s]+([A-Z][A-Za-z\s']+)/i);
+    if (sireMatch) sire = sireMatch[1]!.trim();
+    const damMatch = allText.match(/Dam[:\s]+([A-Z][A-Za-z\s']+)/i);
+    if (damMatch) dam = damMatch[1]!.trim();
+
+    let age = 4;
+    const ageMatch = allText.match(/Age[:\s]+(\d+)/i) ||
+                     allText.match(/(\d+)\s*(?:yo|y\.o\.|year)/i);
+    if (ageMatch) {
+      const a = parseInt(ageMatch[1]!, 10);
+      if (a >= 2 && a <= 12) age = a;
+    }
+
+    let currentRating = 52;
+    const ratingMatch = allText.match(/Rating[:\s]+(\d+)/i) ||
+                        allText.match(/(\d+)\s*(?:pts|points)/i);
+    if (ratingMatch) {
+      const r = parseInt(ratingMatch[1]!, 10);
+      if (r >= 10 && r <= 140) currentRating = r;
+    }
+
+    let seasonStarts = 0, seasonWins = 0, seasonPlaces = 0;
+    const seasonMatch = allText.match(/Season[^:]*:\s*(\d+)-(\d+)-(\d+)/i);
+    if (seasonMatch) {
+      seasonStarts = parseInt(seasonMatch[1]!, 10);
+      seasonWins = parseInt(seasonMatch[2]!, 10);
+      seasonPlaces = parseInt(seasonMatch[3]!, 10);
+    }
+
+    let careerStarts = 0, careerWins = 0, careerPlaces = 0;
+    const careerMatch = allText.match(/Career[^:]*:\s*(\d+)-(\d+)-(\d+)/i);
+    if (careerMatch) {
+      careerStarts = parseInt(careerMatch[1]!, 10);
+      careerWins = parseInt(careerMatch[2]!, 10);
+      careerPlaces = parseInt(careerMatch[3]!, 10);
+    }
+
+    let totalPrizeMoney = 0;
+    const prizeMatch = allText.match(/(?:Prize|Earnings)[^$]*\$\s*([\d,]+)/i);
+    if (prizeMatch) {
+      totalPrizeMoney = parseInt(prizeMatch[1]!.replace(/,/g, ''), 10);
+    }
+
+    return {
+      sex, color, origin, sire, dam, age, currentRating,
+      seasonStarts, seasonWins, seasonPlaces,
+      careerStarts, careerWins, careerPlaces,
+      totalPrizeMoney,
+    };
+  }
+
+  /**
+   * Fetch the HKJC horse profile page and return parsed data.
+   * Returns null if the page is empty or parsing fails.
+   */
+  async scrapeHorseProfile(horseCode: string): Promise<ReturnType<typeof HistoricalScraper.parseHorseProfileHtml>> {
+    const url = `${this.config.baseUrl}/en-us/local/information/horse?HorseId=${encodeURIComponent(horseCode)}`;
+    try {
+      const html = await this.fetchPage(url);
+      return HistoricalScraper.parseHorseProfileHtml(html);
+    } catch {
+      return null;
+    }
   }
 
   async scrapeRaceResult(date: Date, venue: Venue, raceNumber: number): Promise<ScrapedRaceResult> {
@@ -628,8 +787,25 @@ export class HistoricalScraper {
     return rows;
   }
 
+  private static parseGearFromText(text: string): string[] {
+    const codes: string[] = [];
+    const gearMap: Record<string, boolean> = {
+      TT: false, XB: false, PC: false, SR: false, CP: false,
+      B: false, H: false, P: false, V: false, E: false,
+    };
+    for (const key of ['TT', 'XB', 'PC', 'SR', 'CP']) {
+      if (text.includes(key)) { gearMap[key] = true; codes.push(key); }
+    }
+    for (const key of ['B', 'H', 'P', 'V', 'E']) {
+      if (!gearMap[key] && text.includes(key)) codes.push(key);
+    }
+    return codes;
+  }
+
   /**
-   * Declarations table on racecard HTML (reference raceCard.parseEntryRow; no weights/gear).
+   * Declarations table on racecard HTML.
+   * Extracts identity + racecard-table fields (draw, weight, age, rating, gear, isScratched).
+   * Ported from reference `raceCard.ts parseEntryRow`.
    */
   private parseRacecardRunners($: cheerio.CheerioAPI): ScrapedRaceRunner[] {
     const out: ScrapedRaceRunner[] = [];
@@ -656,6 +832,7 @@ export class HistoricalScraper {
       let jockeyId: string | undefined;
       let trainerName: string | undefined;
       let trainerId: string | undefined;
+      let trainerCellIdx = -1;
       let hasJockeyLink = false;
 
       $row.find('a').each((_, link) => {
@@ -694,11 +871,70 @@ export class HistoricalScraper {
             else if (parentText && parentText.length >= 2 && parentText.length < 50)
               trainerName = parentText;
           }
+          const $trainerTd = $link.closest('td');
+          trainerCellIdx = cells.index($trainerTd);
         }
       });
 
       if (!hasJockeyLink) return;
       if (!horseName || horseName.length < 2) return;
+
+      // --- Weight: 3-digit number 100-140 ---
+      let weight: number | undefined;
+      for (let i = 0; i < cellTexts.length; i++) {
+        const wm = cellTexts[i]!.match(/^(\d{3})$/);
+        if (wm) {
+          const w = parseInt(wm[1]!, 10);
+          if (w >= 100 && w <= 140) { weight = w; break; }
+        }
+      }
+
+      // --- Draw: 1-2 digit number in early columns, different from horseNumber ---
+      let draw: number | undefined;
+      for (let i = 1; i < Math.min(cellTexts.length, 8); i++) {
+        const t = cellTexts[i]!.trim();
+        if (/^\d{1,2}$/.test(t)) {
+          const d = parseInt(t, 10);
+          if (d >= 1 && d <= 14 && d !== horseNumber) { draw = d; break; }
+        }
+      }
+
+      // --- Rating & ratingChange: columns after trainer (skip Int'l Rtg) ---
+      let currentRating: number | undefined;
+      let ratingChange: number | undefined;
+      if (trainerCellIdx >= 0 && trainerCellIdx + 2 < cellTexts.length) {
+        const rtgText = cellTexts[trainerCellIdx + 2]?.trim();
+        if (rtgText) {
+          const rtgVal = parseInt(rtgText, 10);
+          if (!isNaN(rtgVal) && rtgVal >= 10 && rtgVal <= 140) currentRating = rtgVal;
+        }
+        const rtgChangeText = cellTexts[trainerCellIdx + 3]?.trim();
+        if (rtgChangeText) {
+          const cv = parseInt(rtgChangeText, 10);
+          if (!isNaN(cv) && cv >= -30 && cv <= 30) ratingChange = cv;
+        }
+      }
+
+      // --- Age: column at trainerCellIdx + 7 ---
+      let age: number | undefined;
+      if (trainerCellIdx >= 0 && trainerCellIdx + 7 < cellTexts.length) {
+        const ageText = cellTexts[trainerCellIdx + 7]?.trim();
+        if (ageText) {
+          const av = parseInt(ageText, 10);
+          if (!isNaN(av) && av >= 2 && av <= 12) age = av;
+        }
+      }
+
+      // --- Gear: letter codes from full row text ---
+      const rowText = $row.text();
+      const gear = HistoricalScraper.parseGearFromText(rowText);
+
+      // --- Scratched ---
+      const rowLower = rowText.toLowerCase();
+      const isScratched =
+        $row.hasClass('scratched') ||
+        rowLower.includes('scratched') ||
+        rowLower.includes('withdrawn');
 
       const r: ScrapedRaceRunner = { horseNumber };
       r.horseName = horseName;
@@ -707,6 +943,13 @@ export class HistoricalScraper {
       if (jockeyId) r.jockeyId = jockeyId;
       if (trainerName) r.trainerName = trainerName;
       if (trainerId) r.trainerId = trainerId;
+      if (draw !== undefined) r.draw = draw;
+      if (weight !== undefined) r.weight = weight;
+      if (age !== undefined) r.age = age;
+      if (currentRating !== undefined) r.currentRating = currentRating;
+      if (ratingChange !== undefined) r.ratingChange = ratingChange;
+      if (gear.length > 0) r.gear = gear;
+      if (isScratched) r.isScratched = true;
       out.push(r);
     });
 
@@ -787,7 +1030,7 @@ export class HistoricalScraper {
   }
 
   /**
-   * Non-result race fields for Meeting.races (Strapi meeting.race-metadata).
+   * Non-result race fields for a per-race Meeting record.
    * Fetched from localresults first; if no result rows, from racecard.
    */
   async scrapeFullMeetingRaceMetadata(
@@ -814,7 +1057,7 @@ export class HistoricalScraper {
     return out;
   }
 
-  private async scrapeRaceMetadataForMeetingSlot(
+  async scrapeRaceMetadataForMeetingSlot(
     date: Date,
     venueCode: 'ST' | 'HV',
     raceNumber: number

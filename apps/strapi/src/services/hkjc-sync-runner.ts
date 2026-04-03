@@ -3,6 +3,7 @@ import {
   runHkjcMeetingsJob,
   runHkjcHistoryJob,
 } from './hkjc-daily-job';
+import type { MeetingsJobOptions } from './hkjc-daily-job';
 
 const running = {
   fixture: false,
@@ -33,11 +34,14 @@ export async function runHkjcFixtureJobOnce(strapi: any): Promise<{ started: boo
   }
 }
 
-export async function runHkjcMeetingsJobOnce(strapi: any): Promise<{ started: boolean }> {
+export async function runHkjcMeetingsJobOnce(
+  strapi: any,
+  opts?: MeetingsJobOptions
+): Promise<{ started: boolean }> {
   if (running.meetings) return { started: false };
   running.meetings = true;
   try {
-    await runHkjcMeetingsJob(strapi);
+    await runHkjcMeetingsJob(strapi, opts);
     return { started: true };
   } finally {
     running.meetings = false;

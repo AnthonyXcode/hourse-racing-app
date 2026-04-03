@@ -4,10 +4,6 @@ import { HistoricalScraper, type ScrapedRaceResult, type Venue } from './hkjc-hi
 
 export type MeetingRow = { date: string; venue: 'ST' | 'HV' };
 
-function meetingKey(date: string, venue: string): string {
-  return `${date}_${venue}`;
-}
-
 function venueCodeToVenue(code: 'ST' | 'HV'): Venue {
   return code === 'HV' ? 'Happy Valley' : 'Sha Tin';
 }
@@ -15,6 +11,26 @@ function venueCodeToVenue(code: 'ST' | 'HV'): Venue {
 function resolvedVenueFromRows(rows: ScrapedRaceResult[]): 'ST' | 'HV' {
   const v = rows[0]?.venue;
   return v === 'Happy Valley' ? 'HV' : 'ST';
+}
+
+/**
+ * Find the first Meeting record for a given date+venue.
+ * With per-race keys (e.g. 2025-10-01_ST_R1), we look up by raceDate+venue
+ * and prefer the lowest raceNumber (R1).
+ */
+async function findMeetingForDateVenue(
+  documents: any,
+  date: string,
+  venue: 'ST' | 'HV'
+): Promise<{ documentId: string } | null> {
+  const row = await documents('api::meeting.meeting').findFirst({
+    filters: {
+      raceDate: { $eq: date },
+      venue: { $eq: venue },
+    },
+    sort: ['raceNumber:asc'],
+  });
+  return row?.documentId ? row : null;
 }
 
 export type HistoricalSyncStats = {
@@ -101,10 +117,7 @@ export async function syncMissingMeetingHistories(
         break;
       }
 
-      const key = meetingKey(m.date, m.venue);
-      const scheduledMeeting = await documents('api::meeting.meeting').findFirst({
-        filters: { key: { $eq: key } },
-      });
+      const scheduledMeeting = await findMeetingForDateVenue(documents, m.date, m.venue);
       if (!scheduledMeeting?.documentId) {
         stats.skippedNoMeeting++;
         continue;
@@ -157,12 +170,9 @@ export async function syncMissingMeetingHistories(
       }
 
       const resolvedCode = resolvedVenueFromRows(rows);
-      const resolvedKey = meetingKey(m.date, resolvedCode);
       let targetMeeting = scheduledMeeting;
-      if (resolvedKey !== key) {
-        const altMeeting = await documents('api::meeting.meeting').findFirst({
-          filters: { key: { $eq: resolvedKey } },
-        });
+      if (resolvedCode !== m.venue) {
+        const altMeeting = await findMeetingForDateVenue(documents, m.date, resolvedCode);
         if (altMeeting?.documentId) {
           targetMeeting = altMeeting;
         }
@@ -207,7 +217,7 @@ export async function syncMissingMeetingHistories(
         stats.created++;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        strapi.log.warn(`hkjc-historical-sync: create history failed for ${key}: ${msg}`);
+        strapi.log.warn(`hkjc-historical-sync: create history failed for ${m.date}_${m.venue}: ${msg}`);
         stats.failed++;
       }
 

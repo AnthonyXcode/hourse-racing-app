@@ -17,29 +17,86 @@ function mapRunnerToStrapi(runner: ScrapedRaceRunner): Record<string, unknown> {
   if (runner.trainerDocumentId) {
     o.trainer = { connect: [runner.trainerDocumentId] };
   }
+
+  // racecard-table fields
+  if (runner.draw != null && runner.draw >= 1 && runner.draw <= 14) o.draw = runner.draw;
+  if (runner.weight != null && runner.weight >= 100 && runner.weight <= 140) o.weight = runner.weight;
+  if (runner.age != null && runner.age >= 2 && runner.age <= 12) o.age = runner.age;
+  if (runner.currentRating != null && runner.currentRating >= 10 && runner.currentRating <= 140) {
+    o.currentRating = runner.currentRating;
+  }
+  if (runner.ratingChange != null && runner.ratingChange >= -30 && runner.ratingChange <= 30) {
+    o.ratingChange = runner.ratingChange;
+  }
+  if (runner.gear && runner.gear.length > 0) o.gear = JSON.stringify(runner.gear);
+  if (runner.isScratched) o.isScratched = true;
+
+  // horse-profile fields
+  if (runner.sex) o.sex = runner.sex;
+  if (runner.color) o.color = runner.color;
+  if (runner.origin) o.origin = runner.origin;
+  if (runner.sire) o.sire = runner.sire;
+  if (runner.dam) o.dam = runner.dam;
+  if (runner.seasonStarts != null) o.seasonStarts = runner.seasonStarts;
+  if (runner.seasonWins != null) o.seasonWins = runner.seasonWins;
+  if (runner.seasonPlaces != null) o.seasonPlaces = runner.seasonPlaces;
+  if (runner.careerStarts != null) o.careerStarts = runner.careerStarts;
+  if (runner.careerWins != null) o.careerWins = runner.careerWins;
+  if (runner.careerPlaces != null) o.careerPlaces = runner.careerPlaces;
+  if (runner.totalPrizeMoney != null && runner.totalPrizeMoney > 0) {
+    o.totalPrizeMoney = String(runner.totalPrizeMoney);
+  }
+
+  // jockey stats snapshot
+  if (runner.jockeyNationality) o.jockeyNationality = runner.jockeyNationality;
+  if (runner.jockeyWins != null) o.jockeyWins = runner.jockeyWins;
+  if (runner.jockeySeconds != null) o.jockeySeconds = runner.jockeySeconds;
+  if (runner.jockeyThirds != null) o.jockeyThirds = runner.jockeyThirds;
+  if (runner.jockeyFourths != null) o.jockeyFourths = runner.jockeyFourths;
+  if (runner.jockeyTotalRides != null) o.jockeyTotalRides = runner.jockeyTotalRides;
+  if (runner.jockeyWinPercent != null) o.jockeyWinPercent = runner.jockeyWinPercent;
+  if (runner.jockeyStakesWon != null && runner.jockeyStakesWon > 0) {
+    o.jockeyStakesWon = String(runner.jockeyStakesWon);
+  }
+  if (runner.jockeyWinsLast10Days != null) o.jockeyWinsLast10Days = runner.jockeyWinsLast10Days;
+
+  // trainer stats snapshot
+  if (runner.trainerWins != null) o.trainerWins = runner.trainerWins;
+  if (runner.trainerSeconds != null) o.trainerSeconds = runner.trainerSeconds;
+  if (runner.trainerThirds != null) o.trainerThirds = runner.trainerThirds;
+  if (runner.trainerTotalRunners != null) o.trainerTotalRunners = runner.trainerTotalRunners;
+  if (runner.trainerWinPercent != null) o.trainerWinPercent = runner.trainerWinPercent;
+
   return o;
 }
 
+export type PerRaceMeetingPayload = {
+  raceNumber: number;
+  raceName?: string;
+  raceClass?: string;
+  distance?: number;
+  surface?: string;
+  going?: string;
+  prizeMoney?: string;
+  runners: Record<string, unknown>[];
+};
+
 /**
- * Maps HKJC meeting metadata scrapes into Strapi `meeting.race-metadata` component payloads.
+ * Maps a single ScrapedRaceMetadata into a per-race Meeting payload
+ * (top-level race fields + runners array).
  */
-export function mapScrapedRaceMetadataToStrapiRaces(
-  rows: ScrapedRaceMetadata[]
-): Record<string, unknown>[] {
-  return rows.map((r) => {
-    const out: Record<string, unknown> = {
-      raceId: r.raceId,
-      raceDate: r.raceDate,
-      venue: r.venue,
-      raceNumber: r.raceNumber,
-      raceClass: r.raceClass,
-      distance: r.distance,
-      surface: r.surface,
-      going: r.going,
-      prizeMoney: r.prizeMoney,
-      runners: (r.runners ?? []).map(mapRunnerToStrapi),
-    };
-    if (r.raceName) out.raceName = r.raceName;
-    return out;
-  });
+export function mapScrapedRaceToMeetingPayload(
+  meta: ScrapedRaceMetadata
+): PerRaceMeetingPayload {
+  const out: PerRaceMeetingPayload = {
+    raceNumber: meta.raceNumber,
+    runners: (meta.runners ?? []).map(mapRunnerToStrapi),
+  };
+  if (meta.raceName) out.raceName = meta.raceName;
+  if (meta.raceClass) out.raceClass = meta.raceClass;
+  if (meta.distance) out.distance = meta.distance;
+  if (meta.surface) out.surface = meta.surface;
+  if (meta.going) out.going = meta.going;
+  if (meta.prizeMoney != null) out.prizeMoney = String(meta.prizeMoney);
+  return out;
 }

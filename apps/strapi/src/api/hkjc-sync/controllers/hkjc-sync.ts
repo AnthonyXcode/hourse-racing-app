@@ -7,6 +7,7 @@ import {
   isHkjcHistoryJobRunning,
 } from '../../../services/hkjc-sync-runner';
 import { getAppStrapi } from '../../../services/strapi-instance';
+import type { MeetingsJobOptions } from '../../../services/hkjc-daily-job';
 
 function readTriggerSecret(ctx: any): string | undefined {
   return (
@@ -33,6 +34,45 @@ function rejectUnlessSecretOk(ctx: any): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Parse a raceNo query param into an array of race numbers.
+ * Supports: "1", "1-5", "1,3,7", "1-3,7,9-11"
+ */
+function parseRaceNumbers(raw: string): number[] {
+  const nums = new Set<number>();
+  for (const part of raw.split(',')) {
+    const trimmed = part.trim();
+    const rangeParts = trimmed.split('-');
+    if (rangeParts.length === 2) {
+      const lo = Number(rangeParts[0]);
+      const hi = Number(rangeParts[1]);
+      if (Number.isInteger(lo) && Number.isInteger(hi) && lo >= 1 && hi >= lo && hi <= 14) {
+        for (let i = lo; i <= hi; i++) nums.add(i);
+      }
+    } else {
+      const n = Number(trimmed);
+      if (Number.isInteger(n) && n >= 1 && n <= 14) nums.add(n);
+    }
+  }
+  return Array.from(nums).sort((a, b) => a - b);
+}
+
+function parseMeetingsQueryParams(ctx: any): MeetingsJobOptions {
+  const opts: MeetingsJobOptions = {};
+  const q = ctx.query ?? {};
+  if (typeof q.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.date)) {
+    opts.date = q.date;
+  }
+  if (typeof q.venue === 'string' && (q.venue === 'ST' || q.venue === 'HV')) {
+    opts.venue = q.venue;
+  }
+  if (typeof q.raceNo === 'string' && q.raceNo.length > 0) {
+    const nums = parseRaceNumbers(q.raceNo);
+    if (nums.length > 0) opts.raceNumbers = nums;
+  }
+  return opts;
 }
 
 const SYNC_TIMEOUT_MS = 3 * 60 * 1000;
@@ -89,7 +129,10 @@ export default {
   },
 
   async triggerMeetings(ctx: any) {
-    await runTrigger(ctx, isHkjcMeetingsJobRunning, runHkjcMeetingsJobOnce);
+    const opts = parseMeetingsQueryParams(ctx);
+    await runTrigger(ctx, isHkjcMeetingsJobRunning, (strapi) =>
+      runHkjcMeetingsJobOnce(strapi, opts)
+    );
   },
 
   async triggerHistory(ctx: any) {

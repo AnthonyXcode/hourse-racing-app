@@ -188,60 +188,64 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
   };
 }
 
-export interface MeetingRaceMetadata extends Struct.ComponentSchema {
-  collectionName: 'components_meeting_race_metadatas';
+export interface MeetingRaceRunner extends Struct.ComponentSchema {
+  collectionName: 'components_meeting_race_runners';
   info: {
-    description: 'Non-result race fields (same as History race-result minus dividends and finish order)';
-    displayName: 'Race metadata';
+    description: 'Full racecard entry: horse identity, jockey/trainer, racecard-table fields (draw, weight, age, rating, gear) and horse-profile fields (sex, color, origin, career stats).';
+    displayName: 'Race runner';
   };
   attributes: {
-    distance: Schema.Attribute.Integer &
+    age: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 12;
+          min: 2;
+        },
+        number
+      >;
+    careerPlaces: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
           min: 0;
         },
         number
-      >;
-    going: Schema.Attribute.Enumeration<
-      [
-        'Firm',
-        'Good to Firm',
-        'Good',
-        'Good to Yielding',
-        'Yielding',
-        'Soft',
-        'Heavy',
-        'Wet Fast',
-        'Wet Slow',
-      ]
-    >;
-    prizeMoney: Schema.Attribute.BigInteger;
-    raceClass: Schema.Attribute.String;
-    raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
-    raceId: Schema.Attribute.String & Schema.Attribute.Required;
-    raceName: Schema.Attribute.String;
-    raceNumber: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    careerStarts: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    careerWins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    color: Schema.Attribute.String;
+    currentRating: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 140;
+          min: 10;
+        },
+        number
+      >;
+    dam: Schema.Attribute.String;
+    draw: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 14;
           min: 1;
         },
         number
       >;
-    runners: Schema.Attribute.Component<'meeting.race-runner', true>;
-    surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
-    venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
-      Schema.Attribute.Required;
-  };
-}
-
-export interface MeetingRaceRunner extends Struct.ComponentSchema {
-  collectionName: 'components_meeting_race_runners';
-  info: {
-    description: 'Horse line-up fields aligned with history.finish-placing, excluding result-only fields (position, time, margin). Win odds: local results page (past); bet.hkjc WP when only racecard is available.';
-    displayName: 'Race runner';
-  };
-  attributes: {
+    gear: Schema.Attribute.Text;
     horseCode: Schema.Attribute.String;
     horseName: Schema.Attribute.String;
     horseNumber: Schema.Attribute.Integer &
@@ -252,12 +256,143 @@ export interface MeetingRaceRunner extends Struct.ComponentSchema {
         },
         number
       >;
+    isScratched: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     jockey: Schema.Attribute.Relation<'manyToOne', 'api::jockey.jockey'>;
+    jockeyFourths: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
     jockeyId: Schema.Attribute.String;
     jockeyName: Schema.Attribute.String;
+    jockeyNationality: Schema.Attribute.String;
+    jockeySeconds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    jockeyStakesWon: Schema.Attribute.BigInteger &
+      Schema.Attribute.DefaultTo<'0'>;
+    jockeyThirds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    jockeyTotalRides: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    jockeyWinPercent: Schema.Attribute.Decimal;
+    jockeyWins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    jockeyWinsLast10Days: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    origin: Schema.Attribute.String;
+    ratingChange: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 30;
+          min: -30;
+        },
+        number
+      >;
+    seasonPlaces: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    seasonStarts: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    seasonWins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    sex: Schema.Attribute.Enumeration<['G', 'H', 'M', 'R']>;
+    sire: Schema.Attribute.String;
+    totalPrizeMoney: Schema.Attribute.BigInteger &
+      Schema.Attribute.DefaultTo<'0'>;
     trainer: Schema.Attribute.Relation<'manyToOne', 'api::trainer.trainer'>;
     trainerId: Schema.Attribute.String;
     trainerName: Schema.Attribute.String;
+    trainerSeconds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    trainerThirds: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    trainerTotalRunners: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    trainerWinPercent: Schema.Attribute.Decimal;
+    trainerWins: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    weight: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 140;
+          min: 100;
+        },
+        number
+      >;
     winOdds: Schema.Attribute.Decimal;
   };
 }
@@ -270,7 +405,6 @@ declare module '@strapi/strapi' {
       'history.dividend-amount': HistoryDividendAmount;
       'history.finish-placing': HistoryFinishPlacing;
       'history.race-result': HistoryRaceResult;
-      'meeting.race-metadata': MeetingRaceMetadata;
       'meeting.race-runner': MeetingRaceRunner;
     }
   }

@@ -2,20 +2,34 @@ import { parse } from 'date-fns';
 import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
 import { HistoricalScraper } from './hkjc-historical-scraper';
 import { syncMissingMeetingHistories } from './hkjc-historical-sync';
-import { enrichMeetingRaceMetadatasWithJockeyTrainer } from './hkjc-jockey-trainer-sync';
-import { mapScrapedRaceMetadataToStrapiRaces } from './meeting-races-mapper';
+import {
+  enrichMeetingRaceMetadatasWithJockeyTrainer,
+  enrichRunnersWithHorseProfiles,
+} from './hkjc-jockey-trainer-sync';
+import { mapScrapedRaceToMeetingPayload } from './meeting-races-mapper';
+import type { ScrapedRaceMetadata } from './hkjc-historical-scraper';
 
 export type MeetingRow = { date: string; venue: 'ST' | 'HV' };
 
-function meetingKey(date: string, venue: string): string {
+export type MeetingsJobOptions = {
+  date?: string;
+  venue?: 'ST' | 'HV';
+  raceNumbers?: number[];
+};
+
+function fixtureKey(date: string, venue: string): string {
   return `${date}_${venue}`;
+}
+
+function raceKey(date: string, venue: string, raceNumber: number): string {
+  return `${date}_${venue}_R${raceNumber}`;
 }
 
 function dedupeMeetingRows(rows: MeetingRow[]): MeetingRow[] {
   const seen = new Set<string>();
   const out: MeetingRow[] = [];
   for (const m of rows) {
-    const k = meetingKey(m.date, m.venue);
+    const k = fixtureKey(m.date, m.venue);
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(m);
@@ -31,12 +45,6 @@ function latestFixtureDate(slots: MeetingRow[]): string | null {
     if (max == null || s.date > max) max = s.date;
   }
   return max;
-}
-
-function meetingHasRaceDetails(row: unknown): boolean {
-  if (!row || typeof row !== 'object') return false;
-  const races = (row as { races?: unknown }).races;
-  return Array.isArray(races) && races.length > 0;
 }
 
 function normalizeRaceDate(value: unknown): string {
@@ -73,7 +81,7 @@ export async function loadAllFixtureMeetings(documents: any): Promise<MeetingRow
 /** Persist new HKJC slots as Fixture documents (idempotent by `key`). */
 async function createFixtureRowsIfMissing(documents: any, slots: MeetingRow[]): Promise<void> {
   for (const m of slots) {
-    const key = meetingKey(m.date, m.venue);
+    const key = fixtureKey(m.date, m.venue);
     const found = await documents('api::fixture.fixture').findFirst({
       filters: { key: { $eq: key } },
     });
@@ -251,9 +259,13 @@ export async function runHkjcFixtureJob(strapi: any): Promise<void> {
 }
 
 /**
- * 6:30 cron — Fixture collection → Meeting rows (by key).
+ * 6:30 cron — Scrape HKJC racecards and upsert per-race Meeting records.
+ * Each Meeting record key = `yyyy-MM-dd_VV_RN` (e.g. 2025-10-01_ST_R1).
  */
-export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
+export async function runHkjcMeetingsJob(
+  strapi: any,
+  opts?: MeetingsJobOptions
+): Promise<void> {
   const documents = strapi.documents;
   if (!documents) {
     strapi.log.error('hkjc-meetings-job: strapi.documents unavailable');
@@ -275,11 +287,9 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
   }
 
   const phases: PhaseEntry[] = [];
-  let meetingsCreated: number | undefined;
-  let meetingsExisting: number | undefined;
-
-  let meetingsRaceDetailsUpdated: number | undefined;
-  let meetingsRaceDetailsFailed: number | undefined;
+  let racesCreated = 0;
+  let racesUpdated = 0;
+  let racesFailed = 0;
 
   const fail = async (summary: string) => {
     await documents('api::healthcheck.healthcheck').update({
@@ -289,163 +299,146 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
         completedAt: new Date().toISOString(),
         summary,
         metrics: metricsPayload(phases, {
-          meetingsCreated,
-          meetingsExisting,
-          meetingsRaceDetailsUpdated,
-          meetingsRaceDetailsFailed,
+          meetingsCreated: racesCreated,
+          meetingsRaceDetailsUpdated: racesUpdated,
+          meetingsRaceDetailsFailed: racesFailed,
         }),
       },
     });
   };
 
   try {
-    const meetingsRaw = await loadAllFixtureMeetings(documents);
-    const meetings = dedupeMeetingRows(meetingsRaw);
-    if (meetings.length === 0) {
-      phases.push({
-        name: 'fixtures',
-        status: 'skipped',
-        detail: 'Fixture collection empty',
-      });
-      phases.push({ name: 'meetings', status: 'skipped', detail: 'Nothing to sync' });
-    } else {
-      phases.push({
-        name: 'fixtures',
-        status: 'success',
-        detail: `${meetings.length} unique slots from Fixture (${meetingsRaw.length} rows)`,
-      });
-      let created = 0;
-      let alreadyHad = 0;
-      for (const m of meetings) {
-        const key = meetingKey(m.date, m.venue);
-        const found = await documents('api::meeting.meeting').findFirst({
-          filters: { key: { $eq: key } },
-        });
-        if (found) {
-          alreadyHad++;
-          continue;
-        }
-        await documents('api::meeting.meeting').create({
+    let targetDate = opts?.date;
+    let targetVenue = opts?.venue;
+    const targetRaceNumbers = opts?.raceNumbers ?? Array.from({ length: 12 }, (_, i) => i + 1);
+
+    if (!targetDate) {
+      const meetingsRaw = await loadAllFixtureMeetings(documents);
+      const meetings = dedupeMeetingRows(meetingsRaw);
+      const latest = latestFixtureDate(meetings);
+      if (!latest) {
+        phases.push({ name: 'detect_date', status: 'skipped', detail: 'No fixture dates found' });
+        await documents('api::healthcheck.healthcheck').update({
+          documentId: hcId,
           data: {
-            key,
-            raceDate: m.date,
-            venue: m.venue,
-            scrapeStatus: 'not_started',
-            source: 'hkjc',
+            status: 'success',
+            completedAt: new Date().toISOString(),
+            summary: 'No fixture dates to process',
+            metrics: metricsPayload(phases, {}),
           },
         });
-        created++;
+        return;
       }
-      meetingsCreated = created;
-      meetingsExisting = alreadyHad;
-
-      const fetchEnabled = process.env.HKJC_MEETING_DETAILS_FETCH_ENABLED !== 'false';
-      // Default 1 per run so HTTP triggers return before proxy/browser timeouts; raise via env for cron.
-      const maxDetailMeetings = Math.max(
-        1,
-        Number(process.env.HKJC_MEETINGS_DETAILS_MAX_MEETINGS || 1)
-      );
-      let detailsUpdated = 0;
-      let detailsFailed = 0;
-
-      if (!fetchEnabled) {
-        phases.push({
-          name: 'meeting_race_details',
-          status: 'skipped',
-          detail: 'HKJC_MEETING_DETAILS_FETCH_ENABLED=false',
-        });
-      } else {
-        const latestDate = latestFixtureDate(meetings);
-        const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
-        const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
-        const rateLimit = Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20);
-        const scraper = new HistoricalScraper({ baseUrl, headless, rateLimit });
-        let processed = 0;
-        let detailsSkipped = 0;
-        try {
-          await scraper.init();
-          for (const m of meetings) {
-            if (processed >= maxDetailMeetings) break;
-            const key = meetingKey(m.date, m.venue);
-            const row = await documents('api::meeting.meeting').findFirst({
-              filters: { key: { $eq: key } },
-              populate: {
-                races: { populate: ['runners'] },
-              },
-            });
-            if (!row?.documentId) continue;
-
-            const isLatestSlot = latestDate != null && m.date === latestDate;
-            if (!isLatestSlot && meetingHasRaceDetails(row)) {
-              detailsSkipped++;
-              continue;
-            }
-
-            processed++;
-            const meetingDate = parse(m.date, 'yyyy-MM-dd', new Date());
-            let raceMetas = await scraper.scrapeFullMeetingRaceMetadata(meetingDate, m.venue);
-            if (raceMetas.length === 0) {
-              const alt = m.venue === 'ST' ? 'HV' : 'ST';
-              raceMetas = await scraper.scrapeFullMeetingRaceMetadata(meetingDate, alt);
-            }
-
-            if (raceMetas.length === 0) {
-              detailsFailed++;
-              strapi.log.warn(`hkjc-meetings-job: no race metadata for ${key}`);
-              continue;
-            }
-
-            await enrichMeetingRaceMetadatasWithJockeyTrainer(strapi, scraper, raceMetas);
-            const racesPayload = mapScrapedRaceMetadataToStrapiRaces(raceMetas);
-            await documents('api::meeting.meeting').update({
-              documentId: row.documentId,
-              data: {
-                races: racesPayload,
-                source: 'hkjc',
-                raceDetailsScrapedAt: new Date().toISOString(),
-              },
-            });
-            detailsUpdated++;
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          strapi.log.error(`hkjc-meetings-job: race details fetch: ${msg}`);
-          meetingsRaceDetailsUpdated = detailsUpdated;
-          meetingsRaceDetailsFailed = detailsFailed;
-          phases.push({
-            name: 'meeting_race_details',
-            status: 'failure',
-            detail: msg,
-          });
-        } finally {
-          await scraper.close().catch(() => {});
-        }
-
-        if (!phases.some((p) => p.name === 'meeting_race_details')) {
-          meetingsRaceDetailsUpdated = detailsUpdated;
-          meetingsRaceDetailsFailed = detailsFailed;
-          const detailStatus =
-            detailsFailed > 0 && detailsUpdated === 0 ? 'partial' : 'success';
-          phases.push({
-            name: 'meeting_race_details',
-            status: detailStatus,
-            detail: [
-              `updated ${detailsUpdated}`,
-              `skipped ${detailsSkipped} (already had races, not latest date)`,
-              `no data ${detailsFailed}`,
-              `cap ${maxDetailMeetings} fetches`,
-              latestDate ? `latest raceDate ${latestDate} always refreshed` : '',
-            ]
-              .filter(Boolean)
-              .join(', '),
-          });
-        }
+      targetDate = latest;
+      if (!targetVenue) {
+        const venueRow = meetings.find((m) => m.date === latest);
+        targetVenue = venueRow?.venue;
       }
+      phases.push({ name: 'detect_date', status: 'success', detail: `Auto-detected ${targetDate} ${targetVenue ?? '(no venue)'}` });
+    }
 
+    if (!targetVenue) targetVenue = 'ST';
+
+    const fetchEnabled = process.env.HKJC_MEETING_DETAILS_FETCH_ENABLED !== 'false';
+    if (!fetchEnabled) {
       phases.push({
-        name: 'meetings',
-        status: 'success',
-        detail: `created ${created}, already had ${alreadyHad}`,
+        name: 'race_scrape',
+        status: 'skipped',
+        detail: 'HKJC_MEETING_DETAILS_FETCH_ENABLED=false',
+      });
+    } else {
+      const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
+      const headless = process.env.HKJC_PLAYWRIGHT_HEADLESS !== 'false';
+      const rateLimit = Number(process.env.HKJC_RATE_LIMIT_PER_MIN || 20);
+      const scraper = new HistoricalScraper({ baseUrl, headless, rateLimit });
+
+      const horseProfileCache = new Map<string, Awaited<ReturnType<typeof scraper.scrapeHorseProfile>>>();
+      const jockeyCache = new Map();
+      const trainerCache = new Map();
+
+      let venue: 'ST' | 'HV' = targetVenue;
+      const meetingDate = parse(targetDate, 'yyyy-MM-dd', new Date());
+      let consecutiveFailures = 0;
+
+      try {
+        await scraper.init();
+
+        for (const raceNum of targetRaceNumbers) {
+          try {
+            let meta = await scraper.scrapeRaceMetadataForMeetingSlot(meetingDate, venue, raceNum);
+            if (!meta && raceNum === targetRaceNumbers[0]) {
+              const alt = venue === 'ST' ? 'HV' : 'ST';
+              meta = await scraper.scrapeRaceMetadataForMeetingSlot(meetingDate, alt, raceNum);
+              if (meta) venue = alt;
+            }
+            if (!meta) {
+              consecutiveFailures++;
+              if (consecutiveFailures >= 2 && raceNum > targetRaceNumbers[0]) break;
+              continue;
+            }
+            consecutiveFailures = 0;
+
+            await enrichRunnersWithHorseProfiles(scraper, meta.runners, horseProfileCache);
+            await enrichMeetingRaceMetadatasWithJockeyTrainer(
+              strapi, scraper, [meta], jockeyCache, trainerCache
+            );
+
+            const key = raceKey(targetDate, venue, raceNum);
+            const payload = mapScrapedRaceToMeetingPayload(meta);
+
+            const existing = await documents('api::meeting.meeting').findFirst({
+              filters: { key: { $eq: key } },
+            });
+
+            if (existing?.documentId) {
+              await documents('api::meeting.meeting').update({
+                documentId: existing.documentId,
+                data: {
+                  ...payload,
+                  venue,
+                  source: 'hkjc',
+                  scrapeStatus: 'success',
+                  raceDetailsScrapedAt: new Date().toISOString(),
+                },
+              });
+              racesUpdated++;
+            } else {
+              await documents('api::meeting.meeting').create({
+                data: {
+                  key,
+                  raceDate: targetDate,
+                  venue,
+                  ...payload,
+                  source: 'hkjc',
+                  scrapeStatus: 'success',
+                  raceDetailsScrapedAt: new Date().toISOString(),
+                },
+              });
+              racesCreated++;
+            }
+
+            strapi.log.info(
+              `hkjc-meetings-job: ${key} scraped (${meta.runners.length} runners)`
+            );
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            strapi.log.warn(`hkjc-meetings-job: R${raceNum} ${targetDate}_${venue}: ${msg}`);
+            racesFailed++;
+            consecutiveFailures++;
+            if (consecutiveFailures >= 2 && raceNum > targetRaceNumbers[0]) break;
+          }
+        }
+      } finally {
+        await scraper.close().catch(() => {});
+      }
+
+      const total = racesCreated + racesUpdated + racesFailed;
+      const detailStatus: PhaseStatus =
+        total === 0 ? 'skipped' : racesFailed > 0 && racesCreated + racesUpdated === 0 ? 'failure' : racesFailed > 0 ? 'partial' : 'success';
+      phases.push({
+        name: 'race_scrape',
+        status: detailStatus,
+        detail: `created ${racesCreated}, updated ${racesUpdated}, failed ${racesFailed} (races ${targetRaceNumbers.join(',')})`,
       });
     }
 
@@ -459,10 +452,9 @@ export async function runHkjcMeetingsJob(strapi: any): Promise<void> {
         completedAt: new Date().toISOString(),
         summary: 'HKJC meetings job finished',
         metrics: metricsPayload(phases, {
-          meetingsCreated,
-          meetingsExisting,
-          meetingsRaceDetailsUpdated,
-          meetingsRaceDetailsFailed,
+          meetingsCreated: racesCreated,
+          meetingsRaceDetailsUpdated: racesUpdated,
+          meetingsRaceDetailsFailed: racesFailed,
         }),
       },
     });

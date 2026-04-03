@@ -14,7 +14,8 @@
     "key": {
       "type": "string",
       "required": true,
-      "unique": true
+      "unique": true,
+      "description": "Format: yyyy-MM-dd_VV_RN e.g. 2025-10-01_ST_R1"
     },
     "raceDate": {
       "type": "date",
@@ -24,6 +25,47 @@
       "type": "enumeration",
       "enum": ["ST", "HV"],
       "required": true
+    },
+    "raceNumber": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "raceName": {
+      "type": "string"
+    },
+    "raceClass": {
+      "type": "string"
+    },
+    "distance": {
+      "type": "integer",
+      "min": 0
+    },
+    "surface": {
+      "type": "enumeration",
+      "enum": ["Turf", "AWT"]
+    },
+    "going": {
+      "type": "enumeration",
+      "enum": [
+        "Firm",
+        "Good to Firm",
+        "Good",
+        "Good to Yielding",
+        "Yielding",
+        "Soft",
+        "Heavy",
+        "Wet Fast",
+        "Wet Slow"
+      ]
+    },
+    "prizeMoney": {
+      "type": "biginteger"
+    },
+    "runners": {
+      "type": "component",
+      "repeatable": true,
+      "component": "meeting.race-runner"
     },
     "scrapeStatus": {
       "type": "enumeration",
@@ -39,11 +81,6 @@
     },
     "raceDetailsScrapedAt": {
       "type": "datetime"
-    },
-    "races": {
-      "type": "component",
-      "repeatable": true,
-      "component": "meeting.race-metadata"
     },
     "histories": {
       "type": "relation",

@@ -632,6 +632,26 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    distance: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    going: Schema.Attribute.Enumeration<
+      [
+        'Firm',
+        'Good to Firm',
+        'Good',
+        'Good to Yielding',
+        'Yielding',
+        'Soft',
+        'Heavy',
+        'Wet Fast',
+        'Wet Slow',
+      ]
+    >;
     histories: Schema.Attribute.Relation<'oneToMany', 'api::history.history'>;
     key: Schema.Attribute.String &
       Schema.Attribute.Required &
@@ -643,15 +663,27 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
       'api::meeting.meeting'
     > &
       Schema.Attribute.Private;
+    prizeMoney: Schema.Attribute.BigInteger;
     publishedAt: Schema.Attribute.DateTime;
+    raceClass: Schema.Attribute.String;
     raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
     raceDetailsScrapedAt: Schema.Attribute.DateTime;
-    races: Schema.Attribute.Component<'meeting.race-metadata', true>;
+    raceName: Schema.Attribute.String;
+    raceNumber: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      >;
+    runners: Schema.Attribute.Component<'meeting.race-runner', true>;
     scrapeStatus: Schema.Attribute.Enumeration<
       ['not_started', 'pending', 'success', 'failed', 'partial']
     > &
       Schema.Attribute.DefaultTo<'not_started'>;
     source: Schema.Attribute.String & Schema.Attribute.DefaultTo<'hkjc'>;
+    surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

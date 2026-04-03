@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { HistoricalScraper } from './hkjc-historical-scraper';
-import type { ScrapedRaceMetadata } from './hkjc-historical-scraper';
+import type { ScrapedRaceMetadata, ScrapedRaceRunner } from './hkjc-historical-scraper';
 
 function personStatsStaleMs(): number {
   const hours = Math.max(1, Number(process.env.HKJC_PERSON_STATS_STALE_HOURS || 48));
@@ -122,13 +122,63 @@ export function parseTrainerProfileHtml(html: string, code: string): {
   };
 }
 
+type JockeyCacheEntry = {
+  documentId: string;
+  nationality?: string;
+  wins: number;
+  seconds: number;
+  thirds: number;
+  fourths: number;
+  totalRides: number;
+  winPercent: number;
+  stakesWon: number;
+  winsLast10Days: number;
+} | null;
+
+type TrainerCacheEntry = {
+  documentId: string;
+  wins: number;
+  seconds: number;
+  thirds: number;
+  totalRunners: number;
+  winPercent: number;
+} | null;
+
+function jockeyEntryFromRow(row: any): JockeyCacheEntry {
+  if (!row?.documentId) return null;
+  return {
+    documentId: row.documentId as string,
+    nationality: row.nationality ?? undefined,
+    wins: row.wins ?? 0,
+    seconds: row.seconds ?? 0,
+    thirds: row.thirds ?? 0,
+    fourths: row.fourths ?? 0,
+    totalRides: row.totalRides ?? 0,
+    winPercent: row.winPercent ?? 0,
+    stakesWon: Number(row.stakesWon ?? 0),
+    winsLast10Days: row.winsLast10Days ?? 0,
+  };
+}
+
+function trainerEntryFromRow(row: any): TrainerCacheEntry {
+  if (!row?.documentId) return null;
+  return {
+    documentId: row.documentId as string,
+    wins: row.wins ?? 0,
+    seconds: row.seconds ?? 0,
+    thirds: row.thirds ?? 0,
+    totalRunners: row.totalRunners ?? 0,
+    winPercent: row.winPercent ?? 0,
+  };
+}
+
 async function ensureJockey(
   strapi: any,
   scraper: HistoricalScraper,
   hkId: string,
   fallbackName: string | undefined,
   baseUrl: string
-): Promise<string | null> {
+): Promise<JockeyCacheEntry> {
   const documents = strapi.documents;
   if (!documents) return null;
 
@@ -139,7 +189,7 @@ async function ensureJockey(
 
   const syncedAt = existing?.lastStatsSyncedAt;
   if (existing?.documentId && !needsStatsRefresh(syncedAt)) {
-    return existing.documentId as string;
+    return jockeyEntryFromRow(existing);
   }
 
   const url = `${baseUrl}/en-us/local/information/jockeywinstat?JockeyId=${encodeURIComponent(key)}`;
@@ -173,7 +223,7 @@ async function ensureJockey(
     data.stakesWon = parsed.stakesWon;
     data.winsLast10Days = parsed.winsLast10Days;
   } else if (existing) {
-    return existing.documentId as string;
+    return jockeyEntryFromRow(existing);
   }
 
   try {
@@ -182,10 +232,10 @@ async function ensureJockey(
         documentId: existing.documentId,
         data,
       });
-      return existing.documentId as string;
+      return jockeyEntryFromRow({ ...existing, ...data });
     }
     const created = await documents('api::jockey.jockey').create({ data });
-    return created?.documentId ?? null;
+    return jockeyEntryFromRow(created);
   } catch (e) {
     strapi.log.warn(
       `hkjc-person-sync: jockey upsert failed ${key}: ${e instanceof Error ? e.message : String(e)}`
@@ -200,7 +250,7 @@ async function ensureTrainer(
   hkId: string,
   fallbackName: string | undefined,
   baseUrl: string
-): Promise<string | null> {
+): Promise<TrainerCacheEntry> {
   const documents = strapi.documents;
   if (!documents) return null;
 
@@ -211,7 +261,7 @@ async function ensureTrainer(
 
   const syncedAt = existing?.lastStatsSyncedAt;
   if (existing?.documentId && !needsStatsRefresh(syncedAt)) {
-    return existing.documentId as string;
+    return trainerEntryFromRow(existing);
   }
 
   const url = `${baseUrl}/en-us/local/information/trainerprofile?trainerid=${encodeURIComponent(key)}`;
@@ -241,7 +291,7 @@ async function ensureTrainer(
     data.totalRunners = parsed.totalRunners;
     data.winPercent = parsed.winPercent;
   } else if (existing) {
-    return existing.documentId as string;
+    return trainerEntryFromRow(existing);
   }
 
   try {
@@ -250,10 +300,10 @@ async function ensureTrainer(
         documentId: existing.documentId,
         data,
       });
-      return existing.documentId as string;
+      return trainerEntryFromRow({ ...existing, ...data });
     }
     const created = await documents('api::trainer.trainer').create({ data });
-    return created?.documentId ?? null;
+    return trainerEntryFromRow(created);
   } catch (e) {
     strapi.log.warn(
       `hkjc-person-sync: trainer upsert failed ${key}: ${e instanceof Error ? e.message : String(e)}`
@@ -263,13 +313,16 @@ async function ensureTrainer(
 }
 
 /**
- * For each runner in meeting race metadata, link Strapi Jockey / Trainer and refresh HKJC stats
- * when `lastStatsSyncedAt` is older than HKJC_PERSON_STATS_STALE_HOURS (default 48).
+ * For each runner in meeting race metadata, link Strapi Jockey / Trainer, refresh HKJC stats
+ * when `lastStatsSyncedAt` is older than HKJC_PERSON_STATS_STALE_HOURS (default 48),
+ * and snapshot the current jockey/trainer stats onto the runner.
  */
 export async function enrichMeetingRaceMetadatasWithJockeyTrainer(
   strapi: any,
   scraper: HistoricalScraper,
-  metadatas: ScrapedRaceMetadata[]
+  metadatas: ScrapedRaceMetadata[],
+  jockeyCache?: Map<string, JockeyCacheEntry>,
+  trainerCache?: Map<string, TrainerCacheEntry>
 ): Promise<void> {
   if (process.env.HKJC_PERSON_SYNC_ENABLED === 'false') {
     strapi.log.info('hkjc-person-sync: skipped (HKJC_PERSON_SYNC_ENABLED=false)');
@@ -277,29 +330,90 @@ export async function enrichMeetingRaceMetadatasWithJockeyTrainer(
   }
 
   const baseUrl = process.env.HKJC_BASE_URL || 'https://racing.hkjc.com';
-  const jockeyCache = new Map<string, string | null>();
-  const trainerCache = new Map<string, string | null>();
+  const jCache = jockeyCache ?? new Map<string, JockeyCacheEntry>();
+  const tCache = trainerCache ?? new Map<string, TrainerCacheEntry>();
 
   for (const meta of metadatas) {
     for (const runner of meta.runners) {
       if (runner.jockeyId) {
         const k = normalizeHkKey(runner.jockeyId);
-        if (!jockeyCache.has(k)) {
-          const docId = await ensureJockey(strapi, scraper, k, runner.jockeyName, baseUrl);
-          jockeyCache.set(k, docId);
+        if (!jCache.has(k)) {
+          jCache.set(k, await ensureJockey(strapi, scraper, k, runner.jockeyName, baseUrl));
         }
-        const jid = jockeyCache.get(k);
-        if (jid) runner.jockeyDocumentId = jid;
+        const entry = jCache.get(k);
+        if (entry) {
+          runner.jockeyDocumentId = entry.documentId;
+          runner.jockeyNationality = entry.nationality;
+          runner.jockeyWins = entry.wins;
+          runner.jockeySeconds = entry.seconds;
+          runner.jockeyThirds = entry.thirds;
+          runner.jockeyFourths = entry.fourths;
+          runner.jockeyTotalRides = entry.totalRides;
+          runner.jockeyWinPercent = entry.winPercent;
+          runner.jockeyStakesWon = entry.stakesWon;
+          runner.jockeyWinsLast10Days = entry.winsLast10Days;
+        }
       }
       if (runner.trainerId) {
         const k = normalizeHkKey(runner.trainerId);
-        if (!trainerCache.has(k)) {
-          const docId = await ensureTrainer(strapi, scraper, k, runner.trainerName, baseUrl);
-          trainerCache.set(k, docId);
+        if (!tCache.has(k)) {
+          tCache.set(k, await ensureTrainer(strapi, scraper, k, runner.trainerName, baseUrl));
         }
-        const tid = trainerCache.get(k);
-        if (tid) runner.trainerDocumentId = tid;
+        const entry = tCache.get(k);
+        if (entry) {
+          runner.trainerDocumentId = entry.documentId;
+          runner.trainerWins = entry.wins;
+          runner.trainerSeconds = entry.seconds;
+          runner.trainerThirds = entry.thirds;
+          runner.trainerTotalRunners = entry.totalRunners;
+          runner.trainerWinPercent = entry.winPercent;
+        }
       }
     }
+  }
+}
+
+/**
+ * For each runner with a `horseCode`, fetch the HKJC horse profile page and merge
+ * sex, color, origin, sire, dam, season/career stats, totalPrizeMoney, and
+ * overwrite age/currentRating when the profile provides better values.
+ *
+ * The `profileCache` is shared across races within a meeting to avoid re-scraping.
+ */
+export async function enrichRunnersWithHorseProfiles(
+  scraper: HistoricalScraper,
+  runners: ScrapedRaceRunner[],
+  profileCache: Map<string, Awaited<ReturnType<HistoricalScraper['scrapeHorseProfile']>>>
+): Promise<void> {
+  if (process.env.HKJC_HORSE_PROFILE_FETCH_ENABLED === 'false') return;
+
+  for (const runner of runners) {
+    if (!runner.horseCode) continue;
+    const code = runner.horseCode;
+
+    if (!profileCache.has(code)) {
+      const profile = await scraper.scrapeHorseProfile(code);
+      profileCache.set(code, profile);
+    }
+
+    const profile = profileCache.get(code);
+    if (!profile) continue;
+
+    runner.sex = profile.sex;
+    runner.color = profile.color;
+    runner.origin = profile.origin;
+    if (profile.sire) runner.sire = profile.sire;
+    if (profile.dam) runner.dam = profile.dam;
+    if (profile.age >= 2 && profile.age <= 12) runner.age = profile.age;
+    if (profile.currentRating >= 10 && profile.currentRating <= 140) {
+      runner.currentRating = profile.currentRating;
+    }
+    runner.seasonStarts = profile.seasonStarts;
+    runner.seasonWins = profile.seasonWins;
+    runner.seasonPlaces = profile.seasonPlaces;
+    runner.careerStarts = profile.careerStarts;
+    runner.careerWins = profile.careerWins;
+    runner.careerPlaces = profile.careerPlaces;
+    runner.totalPrizeMoney = profile.totalPrizeMoney;
   }
 }

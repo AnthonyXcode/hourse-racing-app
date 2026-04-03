@@ -2,7 +2,7 @@
   "collectionName": "components_meeting_race_runners",
   "info": {
     "displayName": "Race runner",
-    "description": "Horse line-up fields aligned with history.finish-placing, excluding result-only fields (position, time, margin). Win odds: local results page (past); bet.hkjc WP when only racecard is available."
+    "description": "Full racecard entry: horse identity, jockey/trainer, racecard-table fields (draw, weight, age, rating, gear) and horse-profile fields (sex, color, origin, career stats)."
   },
   "options": {},
   "attributes": {
@@ -44,6 +44,155 @@
     "winOdds": {
       "type": "decimal",
       "description": "Starting win odds (decimal) from HKJC local results for past races, or from bet.hkjc WP when using racecard only"
+    },
+    "draw": {
+      "type": "integer",
+      "min": 1,
+      "max": 14
+    },
+    "weight": {
+      "type": "integer",
+      "min": 100,
+      "max": 140,
+      "description": "Declared weight (lbs) for this race"
+    },
+    "age": {
+      "type": "integer",
+      "min": 2,
+      "max": 12
+    },
+    "sex": {
+      "type": "enumeration",
+      "enum": ["G", "H", "M", "R"],
+      "description": "G=Gelding, H=Horse/Stallion/Colt, M=Mare/Filly, R=Rig"
+    },
+    "color": {
+      "type": "string"
+    },
+    "origin": {
+      "type": "string",
+      "description": "Country code (AUS, NZ, IRE, GB, USA, JPN, FR, GER, ARG, etc.)"
+    },
+    "currentRating": {
+      "type": "integer",
+      "min": 10,
+      "max": 140
+    },
+    "ratingChange": {
+      "type": "integer",
+      "min": -30,
+      "max": 30
+    },
+    "gear": {
+      "type": "text",
+      "description": "JSON array of gear codes, e.g. [\"B\",\"P\",\"XB\"]"
+    },
+    "sire": {
+      "type": "string"
+    },
+    "dam": {
+      "type": "string"
+    },
+    "seasonStarts": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "seasonWins": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "seasonPlaces": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "careerStarts": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "careerWins": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "careerPlaces": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "totalPrizeMoney": {
+      "type": "biginteger",
+      "default": "0"
+    },
+    "isScratched": {
+      "type": "boolean",
+      "default": false
+    },
+    "jockeyNationality": {
+      "type": "string"
+    },
+    "jockeyWins": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "jockeySeconds": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "jockeyThirds": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "jockeyFourths": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "jockeyTotalRides": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "jockeyWinPercent": {
+      "type": "decimal"
+    },
+    "jockeyStakesWon": {
+      "type": "biginteger",
+      "default": "0"
+    },
+    "jockeyWinsLast10Days": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "trainerWins": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "trainerSeconds": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "trainerThirds": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "trainerTotalRunners": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "trainerWinPercent": {
+      "type": "decimal"
     }
   }
 }
