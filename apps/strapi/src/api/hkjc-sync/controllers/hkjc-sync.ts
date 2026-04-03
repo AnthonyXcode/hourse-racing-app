@@ -35,12 +35,18 @@ function rejectUnlessSecretOk(ctx: any): boolean {
   return true;
 }
 
+const SYNC_TIMEOUT_MS = 3 * 60 * 1000;
+
 async function runTrigger(
   ctx: any,
   isRunning: () => boolean,
   runOnce: (strapi: any) => Promise<{ started: boolean }>
 ): Promise<void> {
   if (!rejectUnlessSecretOk(ctx)) return;
+
+  if (ctx.req?.socket) {
+    ctx.req.socket.setTimeout(SYNC_TIMEOUT_MS);
+  }
 
   if (isRunning()) {
     ctx.status = 409;
