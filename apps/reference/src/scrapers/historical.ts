@@ -357,12 +357,106 @@ export class HistoricalScraper {
   }
 
   /**
+   * Locate HKJC results table column indices (English / Chinese headers).
+   * Returns null if no table with Act. Wt. / 實際負磅 header is found.
+   */
+  private findResultsTableColumnIndices($: cheerio.CheerioAPI): {
+    actWt: number;
+    declarHorseWt?: number;
+    draw?: number;
+  } | null {
+    const tables = $("table").toArray();
+    for (const table of tables) {
+      const $table = $(table);
+      const headerRows = $table.find("tr").toArray();
+      for (const tr of headerRows) {
+        const $ths = $(tr).find("th");
+        if ($ths.length < 8) continue;
+        const headerTexts = $ths
+          .map((_, th) => $(th).text().replace(/\s+/g, " ").trim().toLowerCase())
+          .get();
+        const looksLikeResultsTable =
+          headerTexts.some((t) => t.includes("horse") && t.includes("no")) ||
+          headerTexts.some((t) => t.includes("馬號"));
+        if (!looksLikeResultsTable) continue;
+
+        let actWt: number | undefined;
+        let declarHorseWt: number | undefined;
+        let draw: number | undefined;
+        $ths.each((i, th) => {
+          const t = $(th).text().replace(/\s+/g, " ").trim();
+          const lower = t.toLowerCase();
+          const isDeclarHorseWt =
+            (lower.includes("declar") && lower.includes("horse") && lower.includes("wt")) ||
+            (t.includes("宣佈") && t.includes("馬匹") && t.includes("體重")) ||
+            (t.includes("馬匹") && t.includes("體重") && !t.includes("實際"));
+          const isActWt =
+            !isDeclarHorseWt &&
+            ((lower.includes("act") && lower.includes("wt") && !lower.includes("declar")) ||
+              /^act\.?\s*wt/i.test(lower) ||
+              t.includes("實際負磅") ||
+              (t.includes("實際") && t.includes("負磅")));
+          const isDraw =
+            /^dr\.?$/i.test(lower) ||
+            lower === "draw" ||
+            t.includes("檔位");
+          if (isDeclarHorseWt) declarHorseWt = i;
+          if (isActWt) actWt = i;
+          if (isDraw) draw = i;
+        });
+        if (actWt !== undefined) {
+          return {
+            actWt,
+            ...(declarHorseWt !== undefined ? { declarHorseWt } : {}),
+            ...(draw !== undefined ? { draw } : {}),
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Parse pounds carried from a table cell (HKJC Act. Wt. is typically 100–140 lb).
+   */
+  private parseActualWeightCarried(text: string): number | undefined {
+    const trimmed = text.trim();
+    const n = parseInt(trimmed.replace(/[^\d]/g, ""), 10);
+    if (Number.isNaN(n) || n < 100 || n > 140) return undefined;
+    return n;
+  }
+
+  /**
+   * HKJC "Declar. Horse Wt." — club scale reading (typically ~1000–1300).
+   */
+  private parseDeclaredHorseWeight(text: string): number | undefined {
+    const trimmed = text.trim();
+    const n = parseInt(trimmed.replace(/[^\d]/g, ""), 10);
+    if (Number.isNaN(n) || n < 700 || n > 2000) return undefined;
+    return n;
+  }
+
+  /** Barrier position from "Dr." column (1–20). */
+  private parseDraw(text: string): number | undefined {
+    const trimmed = text.trim();
+    const n = parseInt(trimmed.replace(/[^\d]/g, ""), 10);
+    if (Number.isNaN(n) || n < 1 || n > 20) return undefined;
+    return n;
+  }
+
+  /**
    * Parse finish order from results table
    * HKJC table columns: Pla., Horse No., Horse, Jockey, Trainer, Act. Wt., 
    * Declar. Horse Wt., Dr., LBW, RunningPosition, Finish Time, Win Odds
    */
   private parseFinishOrder($: cheerio.CheerioAPI): RaceResult["finishOrder"] {
-    const finishOrder: RaceResult["finishOrder"] = [];
+    type FinishRow = RaceResult["finishOrder"][number];
+    const finishOrder: FinishRow[] = [];
+    const tableCols = this.findResultsTableColumnIndices($);
+    /** Fallback indices when header row missing (standard HKJC English layout). */
+    const fallbackActWtCol = 5;
+    const fallbackDeclarHorseWtCol = 6;
+    const fallbackDrawCol = 7;
 
     // Find the main results table - look for table with horse data
     $("table tr").each((_, row) => {
@@ -445,33 +539,61 @@ export class HistoricalScraper {
       let horseName: string | undefined;
       let horseCode: string | undefined;
       let jockeyName: string | undefined;
+      let jockeyId: string | undefined;
       let trainerName: string | undefined;
-      
+      let trainerId: string | undefined;
+
       $row.find("a").each((_, link) => {
         const href = $(link).attr("href") || "";
         const text = $(link).text().trim();
-        
+
         if (href.includes("horse") || href.includes("Horse")) {
           horseName = text;
           const codeMatch = href.match(/horseid[=\/]([^&\/]+)/i);
-          if (codeMatch) horseCode = codeMatch[1];
+          if (codeMatch) horseCode = decodeURIComponent(codeMatch[1]!);
         } else if (href.includes("jockey") || href.includes("Jockey")) {
           jockeyName = text;
+          const jid = href.match(/jockeyid=([^&]+)/i);
+          if (jid) jockeyId = decodeURIComponent(jid[1]!);
         } else if (href.includes("trainer") || href.includes("Trainer")) {
           trainerName = text;
+          const tid = href.match(/trainerid=([^&]+)/i);
+          if (tid) trainerId = decodeURIComponent(tid[1]!);
         }
       });
+
+      const actCol = tableCols?.actWt ?? fallbackActWtCol;
+      const declarCol = tableCols?.declarHorseWt ?? fallbackDeclarHorseWtCol;
+      const drawCol = tableCols?.draw ?? fallbackDrawCol;
+
+      const actualWeight =
+        cells.length > actCol
+          ? this.parseActualWeightCarried(cells.eq(actCol).text())
+          : undefined;
+      const horseWeight =
+        cells.length > declarCol
+          ? this.parseDeclaredHorseWeight(cells.eq(declarCol).text())
+          : undefined;
+      const draw =
+        cells.length > drawCol
+          ? this.parseDraw(cells.eq(drawCol).text())
+          : undefined;
 
       finishOrder.push({
         horseNumber: horseNum,
         finishPosition: position,
-        finishTime,
-        margin,
-        horseName,
-        horseCode,
-        jockeyName,
-        trainerName,
-        winOdds: odds,
+        ...(finishTime !== undefined ? { finishTime } : {}),
+        ...(margin !== undefined ? { margin } : {}),
+        ...(horseName !== undefined ? { horseName } : {}),
+        ...(horseCode !== undefined ? { horseCode } : {}),
+        ...(jockeyName !== undefined ? { jockeyName } : {}),
+        ...(jockeyId !== undefined ? { jockeyId } : {}),
+        ...(trainerName !== undefined ? { trainerName } : {}),
+        ...(trainerId !== undefined ? { trainerId } : {}),
+        ...(draw !== undefined ? { draw } : {}),
+        ...(actualWeight !== undefined ? { actualWeight } : {}),
+        ...(horseWeight !== undefined ? { horseWeight } : {}),
+        ...(odds !== undefined ? { winOdds: odds } : {}),
       });
     });
 

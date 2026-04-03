@@ -15,6 +15,7 @@ import type {
 } from "../src/types/index.js";
 import { DEFAULT_BETTING_CONFIG } from "../src/types/index.js";
 import { RaceCardScraper } from "../src/scrapers/raceCard.js";
+import { RaceCardHistoryScraper } from "../src/scrapers/raceCardHistory.js";
 import { FormAnalyzer } from "../src/analysis/formAnalysis.js";
 import { MonteCarloSimulator } from "../src/simulation/monteCarlo.js";
 import {
@@ -39,6 +40,8 @@ interface CliArgs {
   /** Ignore historical files whose name contains any of these strings (e.g. 20260315,HV). */
   ignoreRecords?: string[];
   raceNumber: number;
+  /** When true, load from saved race card snapshot instead of live scraping. */
+  useSaved?: boolean;
   bankroll?: number;
   kellyFraction?: number;
   minEdge?: number;
@@ -58,6 +61,7 @@ function parseArgs(): CliArgs {
   let formData: "all" | undefined;
   let ignoreRecords: string[] | undefined;
   let raceNumber = 1;
+  let useSaved = false;
   let bankroll: number | undefined;
   let kellyFraction: number | undefined;
   let minEdge: number | undefined;
@@ -96,6 +100,11 @@ function parseArgs(): CliArgs {
           ignoreRecords = next.split(",").map((s) => s.trim()).filter(Boolean);
           i++;
         }
+        break;
+
+      case "--use-saved":
+      case "-s":
+        useSaved = true;
         break;
 
       case "--race":
@@ -139,6 +148,7 @@ function parseArgs(): CliArgs {
   };
   if (formData !== undefined) result.formData = formData;
   if (ignoreRecords !== undefined && ignoreRecords.length > 0) result.ignoreRecords = ignoreRecords;
+  if (useSaved) result.useSaved = true;
   if (bankroll !== undefined) result.bankroll = bankroll;
   if (kellyFraction !== undefined) result.kellyFraction = kellyFraction;
   if (minEdge !== undefined) result.minEdge = minEdge;
@@ -157,6 +167,7 @@ Options:
   -v, --venue <venue>       Venue for race card: "Sha Tin" or "Happy Valley" (default: Sha Tin)
   -f, --form-data <mode>    Form data: "all" = use HV + ST records; if omitted, use --venue only
   --ignore-records <list>   Comma-separated list: skip historical files whose name contains any (e.g. 20260315,20260301,HV)
+  -s, --use-saved           Use saved race card snapshot from data/racecards/ instead of live scraping
   -r, --race <number>       Race number (default: 1)
   -b, --bankroll <amount>   Bankroll in HKD (default: 10000)
   -k, --kelly <fraction>    Kelly fraction 0-1 (default: 0.25)
@@ -168,6 +179,7 @@ Examples:
   npm run analyze -- -d 2026-01-29 -v ST -r 5 --form-data all
   npm run analyze -- -d 2026-01-29 -v "Happy Valley" -r 3 -f all
   npm run analyze -- --race 3 --kelly 0.35
+  npm run analyze -- -d 2026-03-29 -v ST -r 1 --use-saved -f all
 `);
 }
 
@@ -186,11 +198,13 @@ async function analyzeRace(args: CliArgs): Promise<void> {
   if (args.ignoreRecords && args.ignoreRecords.length > 0) {
     console.log(`Ignore records: ${args.ignoreRecords.join(", ")}`);
   }
+  if (args.useSaved) {
+    console.log(`Source: saved race card snapshot`);
+  }
   console.log(`Race: ${args.raceNumber}`);
   console.log("");
 
   // Initialize components
-  const scraper = new RaceCardScraper({ headless: true });
   const formAnalyzer = new FormAnalyzer();
   const simulator = new MonteCarloSimulator({ runs: 10000 });
 
@@ -201,67 +215,137 @@ async function analyzeRace(args: CliArgs): Promise<void> {
   };
 
   const recommendationEngine = new RecommendationEngine(config);
+  let scraper: RaceCardScraper | null = null;
 
   try {
-    // Load historical data for enrichment
-    console.log("Loading historical data...");
-    const enricher =
-      args.ignoreRecords && args.ignoreRecords.length > 0
-        ? new HorseDataEnricher({ ignoreFilePatterns: args.ignoreRecords })
-        : new HorseDataEnricher();
-    await enricher.loadHistoricalData();
-    const dataSummary = enricher.getDataSummary();
-    if (dataSummary.totalRaces > 0) {
-      console.log(`  Found ${dataSummary.totalRaces} historical races`);
-      console.log(`  Indexed ${dataSummary.totalHorses} horse performances`);
+    // -------------------------------------------------------------------
+    // Load race card: either from saved snapshot (--use-saved) or live scrape
+    // -------------------------------------------------------------------
+    let race: Race | null = null;
+    let winOddsMap: Map<number, number>;
+    const historyScraper = new RaceCardHistoryScraper();
+
+    if (args.useSaved) {
+      // Saved snapshot already contains all enrichment + odds — skip scraping & enrichment
+      console.log("Loading saved race card snapshot...");
+      const saved = await historyScraper.loadSavedRaceCard(args.date, args.venue, args.raceNumber);
+      if (saved) {
+        race = saved.race;
+        winOddsMap = saved.winOddsMap;
+        const horsesWithHistory = race.entries.filter(
+          (e) => e.horse.pastPerformances.length > 0
+        ).length;
+        console.log(
+          `[INFO] Loaded saved race card (${race.entries.length} runners, ${horsesWithHistory} with form data, race-day snapshot)`
+        );
+        console.log(`[INFO] Win odds loaded for ${winOddsMap.size} horses\n`);
+      } else {
+        throw new Error(
+          `No saved race card found for Race ${args.raceNumber} at ${args.venue} on ${format(args.date, "yyyy-MM-dd")}. ` +
+          `No file in data/racecards/. Run analyze-race without --use-saved before the meeting to save the race card.`
+        );
+      }
+    } else {
+      // Live scrape + full enrichment pipeline
+      console.log("Loading historical data...");
+      const enricher =
+        args.ignoreRecords && args.ignoreRecords.length > 0
+          ? new HorseDataEnricher({ ignoreFilePatterns: args.ignoreRecords })
+          : new HorseDataEnricher();
+      await enricher.loadHistoricalData();
+      const dataSummary = enricher.getDataSummary();
+      if (dataSummary.totalRaces > 0) {
+        console.log(`  Found ${dataSummary.totalRaces} historical races`);
+        console.log(`  Indexed ${dataSummary.totalHorses} horse performances`);
+      }
+
+      scraper = new RaceCardScraper({ headless: true });
+      try {
+        console.log("Initializing scraper...");
+        await scraper.init();
+
+        console.log("Fetching race card...");
+        const scraped = await scraper.scrapeRaceCard(
+          args.date,
+          args.venue,
+          args.raceNumber
+        );
+
+        if (scraped.entries.length > 0) {
+          race = scraped;
+        }
+      } catch (err) {
+        console.warn(
+          `[WARNING] Race card scrape failed: ${err instanceof Error ? err.message : err}`
+        );
+      }
+
+      if (!race) {
+        throw new Error(
+          `No entries found for Race ${args.raceNumber} at ${args.venue} on ${format(args.date, "yyyy-MM-dd")}. ` +
+          `Live race card is unavailable. If you have a saved snapshot, re-run with --use-saved.`
+        );
+      }
+
+      console.log(`Found ${race.entries.length} entries`);
+
+      // Fetch current odds while scraper is still open
+      if (scraper) {
+        console.log("Fetching current odds...");
+        winOddsMap = await scraper.fetchCurrentOdds(
+          args.date,
+          args.venue,
+          args.raceNumber
+        );
+      } else {
+        winOddsMap = new Map();
+      }
+
+      // Enrich horses with historical data
+      console.log("Enriching horses with past performances...");
+      race = enricher.enrichRace(race, {
+        formVenue: args.formData === "all" ? "all" : args.venue,
+      });
+
+      const horsesWithHistory = race.entries.filter(
+        (e) => e.horse.pastPerformances.length > 0
+      ).length;
+      console.log(`  ${horsesWithHistory}/${race.entries.length} horses enriched with form data\n`);
+
+      // Enrich race with jockey data (from data/jockeys/*.json or HKJC jockeyprofile page)
+      const jockeyEnricher = new JockeyEnricher({ fetchFromHKJC: true });
+      await jockeyEnricher.loadFromDirectory();
+      console.log("Enriching jockeys with season stats...");
+      race = await jockeyEnricher.enrichRace(race);
+      await jockeyEnricher.closeBrowser();
+      console.log(`  ${jockeyEnricher.getCachedCount()} jockey profiles loaded\n`);
+
+      // Enrich race with trainer data (from HKJC trainerprofile page)
+      const trainerEnricher = new TrainerEnricher({ fetchFromHKJC: true });
+      await trainerEnricher.loadFromDirectory();
+      console.log("Enriching trainers with season stats...");
+      race = await trainerEnricher.enrichRace(race);
+      await trainerEnricher.closeBrowser();
+      console.log(`  ${trainerEnricher.getCachedCount()} trainer profiles loaded\n`);
+
+      // Save enriched race card + odds for future --use-saved runs
+      try {
+        const savedPath = await historyScraper.saveRaceCard(race, winOddsMap);
+        console.log(`[INFO] Enriched race card saved to ${savedPath}`);
+      } catch (err) {
+        console.warn(
+          `[WARNING] Could not save race card: ${err instanceof Error ? err.message : err}`
+        );
+      }
     }
 
-    console.log("Initializing scraper...");
-    await scraper.init();
-
-    console.log("Fetching race card...");
-    let race = await scraper.scrapeRaceCard(
-      args.date,
-      args.venue,
-      args.raceNumber
-    );
-
-    // Validate race has entries
-    if (race.entries.length === 0) {
-      throw new Error(
-        `No entries found for Race ${args.raceNumber} at ${args.venue} on ${format(args.date, "yyyy-MM-dd")}. ` +
-        `This could mean: (1) No racing on this date, (2) Race card not yet published, or (3) Invalid race number.`
-      );
+    // Estimate place odds
+    const valueCalc = new ValueCalculator();
+    if (winOddsMap.size === 0) {
+      console.log("[WARNING] No win odds fetched — value calculations will be unreliable");
+    } else {
+      console.log(`[INFO] Win odds for ${winOddsMap.size} horses (place odds estimated from win odds)`);
     }
-
-    console.log(`Found ${race.entries.length} entries`);
-
-    // Enrich horses with historical data
-    console.log("Enriching horses with past performances...");
-    race = enricher.enrichRace(race, {
-      formVenue: args.formData === "all" ? "all" : args.venue,
-    });
-
-    const horsesWithHistory = race.entries.filter(
-      (e) => e.horse.pastPerformances.length > 0
-    ).length;
-    console.log(`  ${horsesWithHistory}/${race.entries.length} horses enriched with form data\n`);
-
-    // Enrich race with jockey data (from data/jockeys/*.json or HKJC jockeyprofile page)
-    const jockeyEnricher = new JockeyEnricher({ fetchFromHKJC: true });
-    await jockeyEnricher.loadFromDirectory();
-    console.log("Enriching jockeys with season stats...");
-    race = await jockeyEnricher.enrichRace(race);
-    await jockeyEnricher.closeBrowser();
-    console.log(`  ${jockeyEnricher.getCachedCount()} jockey profiles loaded\n`);
-
-    // Enrich race with trainer data (from HKJC trainerprofile page)
-    const trainerEnricher = new TrainerEnricher({ fetchFromHKJC: true });
-    await trainerEnricher.loadFromDirectory();
-    console.log("Enriching trainers with season stats...");
-    race = await trainerEnricher.enrichRace(race);
-    await trainerEnricher.closeBrowser();
-    console.log(`  ${trainerEnricher.getCachedCount()} trainer profiles loaded\n`);
 
     // Analyze horses
     console.log("Analyzing form factors...");
@@ -272,21 +356,6 @@ async function analyzeRace(args: CliArgs): Promise<void> {
     const { results: simResults, exoticProbabilities } =
       simulator.simulateRace(race);
 
-    // Fetch current odds
-    console.log("Fetching current odds...");
-    const winOddsMap = await scraper.fetchCurrentOdds(
-      args.date,
-      args.venue,
-      args.raceNumber
-    );
-
-    // Estimate place odds (live place odds not fetched by this scraper)
-    const valueCalc = new ValueCalculator();
-    if (winOddsMap.size === 0) {
-      console.log("[WARNING] No win odds fetched — value calculations will be unreliable");
-    } else {
-      console.log(`[INFO] Win odds fetched for ${winOddsMap.size} horses (place odds estimated from win odds)`);
-    }
     const placeOddsMap = valueCalc.estimatePlaceOdds(winOddsMap);
 
     const marketOdds: MarketOdds = {
@@ -387,7 +456,7 @@ async function analyzeRace(args: CliArgs): Promise<void> {
     
     process.exit(1);
   } finally {
-    await scraper.close();
+    if (scraper) await scraper.close();
   }
 }
 
