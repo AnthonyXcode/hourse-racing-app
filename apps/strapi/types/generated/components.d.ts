@@ -80,6 +80,22 @@ export interface HistoryFinishPlacing extends Struct.ComponentSchema {
     displayName: 'Finish placing';
   };
   attributes: {
+    actualWeight: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 140;
+          min: 100;
+        },
+        number
+      >;
+    draw: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 20;
+          min: 1;
+        },
+        number
+      >;
     finishPosition: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
@@ -96,6 +112,14 @@ export interface HistoryFinishPlacing extends Struct.ComponentSchema {
       Schema.Attribute.SetMinMax<
         {
           min: 1;
+        },
+        number
+      >;
+    horseWeight: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 2000;
+          min: 700;
         },
         number
       >;

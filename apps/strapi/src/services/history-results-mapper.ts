@@ -91,6 +91,12 @@ function mapFinishRow(row: unknown) {
         ? r.trainerCode
         : undefined;
   if (trainerId) out.trainerId = trainerId;
+  const draw = intOrUndef(r.draw);
+  if (draw !== undefined && draw >= 1 && draw <= 20) out.draw = draw;
+  const actualWeight = intOrUndef(r.actualWeight);
+  if (actualWeight !== undefined && actualWeight >= 100 && actualWeight <= 140) out.actualWeight = actualWeight;
+  const horseWeight = intOrUndef(r.horseWeight);
+  if (horseWeight !== undefined && horseWeight >= 700 && horseWeight <= 2000) out.horseWeight = horseWeight;
   const odds = numOrUndef(r.winOdds);
   if (odds !== undefined) out.winOdds = odds;
   return out;

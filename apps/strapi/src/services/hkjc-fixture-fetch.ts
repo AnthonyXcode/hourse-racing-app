@@ -33,6 +33,11 @@ export type FetchedFixture = {
   scannedDayCount: number;
 };
 
+/**
+ * Latest meeting `date` among stored fixture rows (`yyyy-MM-dd` only).
+ * Used so HKJC scanning starts the calendar day after this date (see `fetchHkjcFixtures`).
+ * ISO date strings sort lexicographically by chronology, so plain string compare is correct.
+ */
 function maxFixtureDateIso(rows: { date: string }[]): string | null {
   let max: string | null = null;
   for (const r of rows) {

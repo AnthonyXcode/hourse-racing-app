@@ -42,6 +42,24 @@
       "type": "string",
       "description": "HKJC trainer identifier from profile URL (e.g. trainerid query param)"
     },
+    "draw": {
+      "type": "integer",
+      "min": 1,
+      "max": 20,
+      "description": "Barrier position (Dr. column on HKJC results)"
+    },
+    "actualWeight": {
+      "type": "integer",
+      "min": 100,
+      "max": 140,
+      "description": "Act. Wt. — pounds carried (HKJC results column)"
+    },
+    "horseWeight": {
+      "type": "integer",
+      "min": 700,
+      "max": 2000,
+      "description": "Declar. Horse Wt. — club scale weight in lbs (HKJC results column)"
+    },
     "winOdds": {
       "type": "decimal"
     }

@@ -200,8 +200,11 @@ export default {
     const scheduleMeetings = process.env.HKJC_CRON_MEETINGS_SCHEDULE || '30 6 * * *';
     const scheduleHistory = process.env.HKJC_CRON_HISTORY_SCHEDULE || '45 6 * * *';
 
+    // DONE
     scheduleHkjcCron(strapi, 'fixture', scheduleFixture, tz, runHkjcFixtureJobOnce);
+    // IN PROGRESS
     scheduleHkjcCron(strapi, 'meetings', scheduleMeetings, tz, runHkjcMeetingsJobOnce);
+    // DONE
     scheduleHkjcCron(strapi, 'history', scheduleHistory, tz, runHkjcHistoryJobOnce);
 
     strapi.log.info(

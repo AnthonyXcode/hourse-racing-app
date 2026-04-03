@@ -48,6 +48,9 @@ export type ScrapedRaceResult = {
     jockeyId?: string;
     trainerName?: string;
     trainerId?: string;
+    draw?: number;
+    actualWeight?: number;
+    horseWeight?: number;
     winOdds?: number;
   }[];
   winDividend?: number;
@@ -406,8 +409,79 @@ export class HistoricalScraper {
     };
   }
 
+  /**
+   * Locate HKJC results table column indices for Act. Wt., Declar. Horse Wt., Dr.
+   * (ported from reference `historical.ts`).
+   */
+  private findResultsTableColumnIndices($: cheerio.CheerioAPI): {
+    actWt: number;
+    declarHorseWt?: number;
+    draw?: number;
+  } | null {
+    const tables = $('table').toArray();
+    for (const table of tables) {
+      const $ths = $(table).find('th');
+      if ($ths.length < 5) continue;
+
+      const headerText = $ths.map((_, th) => $(th).text().replace(/\s+/g, ' ').trim()).get().join(' ');
+      const looksLikeResultsTable =
+        (/Act\.?\s*Wt/i.test(headerText) || headerText.includes('實際負磅')) &&
+        (/Horse\s*No/i.test(headerText) || headerText.includes('馬號'));
+      if (!looksLikeResultsTable) continue;
+
+      let actWt: number | undefined;
+      let declarHorseWt: number | undefined;
+      let draw: number | undefined;
+      $ths.each((i, th) => {
+        const t = $(th).text().replace(/\s+/g, ' ').trim();
+        const lower = t.toLowerCase();
+        const isDeclarHorseWt =
+          (lower.includes('declar') && lower.includes('horse') && lower.includes('wt')) ||
+          (t.includes('宣佈') && t.includes('馬匹') && t.includes('體重')) ||
+          (t.includes('馬匹') && t.includes('體重') && !t.includes('實際'));
+        const isActWt =
+          !isDeclarHorseWt &&
+          ((lower.includes('act') && lower.includes('wt') && !lower.includes('declar')) ||
+            /^act\.?\s*wt/i.test(lower) ||
+            t.includes('實際負磅') ||
+            (t.includes('實際') && t.includes('負磅')));
+        const isDraw = /^dr\.?$/i.test(lower) || lower === 'draw' || t.includes('檔位');
+        if (isDeclarHorseWt) declarHorseWt = i;
+        if (isActWt) actWt = i;
+        if (isDraw) draw = i;
+      });
+      if (actWt !== undefined) {
+        return {
+          actWt,
+          ...(declarHorseWt !== undefined ? { declarHorseWt } : {}),
+          ...(draw !== undefined ? { draw } : {}),
+        };
+      }
+    }
+    return null;
+  }
+
+  private parseActualWeight(text: string): number | undefined {
+    const n = parseInt(text.trim().replace(/[^\d]/g, ''), 10);
+    return !isNaN(n) && n >= 100 && n <= 140 ? n : undefined;
+  }
+
+  private parseDeclaredHorseWeight(text: string): number | undefined {
+    const n = parseInt(text.trim().replace(/[^\d]/g, ''), 10);
+    return !isNaN(n) && n >= 700 && n <= 2000 ? n : undefined;
+  }
+
+  private parseDraw(text: string): number | undefined {
+    const n = parseInt(text.trim().replace(/[^\d]/g, ''), 10);
+    return !isNaN(n) && n >= 1 && n <= 20 ? n : undefined;
+  }
+
   private parseFinishOrder($: cheerio.CheerioAPI): ScrapedRaceResult['finishOrder'] {
     const finishOrder: ScrapedRaceResult['finishOrder'] = [];
+    const tableCols = this.findResultsTableColumnIndices($);
+    const fallbackActWtCol = 5;
+    const fallbackDeclarHorseWtCol = 6;
+    const fallbackDrawCol = 7;
 
     $('table tr').each((_, row) => {
       const $row = $(row);
@@ -475,6 +549,17 @@ export class HistoricalScraper {
         }
       }
 
+      const actCol = tableCols?.actWt ?? fallbackActWtCol;
+      const declarCol = tableCols?.declarHorseWt ?? fallbackDeclarHorseWtCol;
+      const drawCol = tableCols?.draw ?? fallbackDrawCol;
+
+      const actualWeight =
+        cells.length > actCol ? this.parseActualWeight(cells.eq(actCol).text()) : undefined;
+      const horseWeight =
+        cells.length > declarCol ? this.parseDeclaredHorseWeight(cells.eq(declarCol).text()) : undefined;
+      const draw =
+        cells.length > drawCol ? this.parseDraw(cells.eq(drawCol).text()) : undefined;
+
       let horseName: string | undefined;
       let horseCode: string | undefined;
       let jockeyName: string | undefined;
@@ -512,6 +597,9 @@ export class HistoricalScraper {
         jockeyId,
         trainerName,
         trainerId,
+        draw,
+        actualWeight,
+        horseWeight,
         winOdds: odds,
       });
     });
