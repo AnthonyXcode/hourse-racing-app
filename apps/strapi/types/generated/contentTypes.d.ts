@@ -733,6 +733,90 @@ export interface ApiMeetingMeeting extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiSubscriptionSubscription
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'subscriptions';
+  info: {
+    description: 'Stripe subscription records';
+    displayName: 'Subscription';
+    pluralName: 'subscriptions';
+    singularName: 'subscription';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    currentPeriodEnd: Schema.Attribute.DateTime;
+    currentPeriodStart: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::subscription.subscription'
+    > &
+      Schema.Attribute.Private;
+    plan: Schema.Attribute.Enumeration<['monthly']> &
+      Schema.Attribute.DefaultTo<'monthly'>;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      ['active', 'cancelled', 'past_due', 'expired']
+    > &
+      Schema.Attribute.DefaultTo<'active'>;
+    stripeCustomerId: Schema.Attribute.String;
+    stripeSubscriptionId: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
+export interface ApiSuggestionSuggestion extends Struct.CollectionTypeSchema {
+  collectionName: 'suggestions';
+  info: {
+    description: 'Racing suggestions derived from analysis';
+    displayName: 'Suggestion';
+    pluralName: 'suggestions';
+    singularName: 'suggestion';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    analysis: Schema.Attribute.Relation<'manyToOne', 'api::analysis.analysis'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::suggestion.suggestion'
+    > &
+      Schema.Attribute.Private;
+    meeting: Schema.Attribute.Relation<'manyToOne', 'api::meeting.meeting'>;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    picks: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    result: Schema.Attribute.Enumeration<
+      ['pending', 'correct', 'partial', 'incorrect']
+    > &
+      Schema.Attribute.DefaultTo<'pending'>;
+    type: Schema.Attribute.Enumeration<['win', 'place', 'trio']> &
+      Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
   collectionName: 'trainers';
   info: {
@@ -1255,7 +1339,6 @@ export interface PluginUsersPermissionsUser
   };
   options: {
     draftAndPublish: false;
-    timestamps: true;
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -1265,7 +1348,6 @@ export interface PluginUsersPermissionsUser
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.Email &
-      Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
@@ -1280,6 +1362,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    phone: Schema.Attribute.String & Schema.Attribute.Unique;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1287,6 +1370,10 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    subscriptionStatus: Schema.Attribute.Enumeration<
+      ['free', 'active', 'cancelled', 'expired']
+    > &
+      Schema.Attribute.DefaultTo<'free'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1316,6 +1403,8 @@ declare module '@strapi/strapi' {
       'api::history.history': ApiHistoryHistory;
       'api::jockey.jockey': ApiJockeyJockey;
       'api::meeting.meeting': ApiMeetingMeeting;
+      'api::subscription.subscription': ApiSubscriptionSubscription;
+      'api::suggestion.suggestion': ApiSuggestionSuggestion;
       'api::trainer.trainer': ApiTrainerTrainer;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

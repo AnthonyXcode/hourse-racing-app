@@ -32,6 +32,12 @@ export default {
     },
     {
       method: 'POST',
+      path: '/hkjc-sync/trigger/suggestions',
+      handler: 'hkjc-sync.triggerSuggestions',
+      config: { auth: false },
+    },
+    {
+      method: 'POST',
       path: '/hkjc-sync/trigger',
       handler: 'hkjc-sync.trigger',
       config: { auth: false },

@@ -1,0 +1,42 @@
+{
+  "kind": "collectionType",
+  "collectionName": "subscriptions",
+  "info": {
+    "singularName": "subscription",
+    "pluralName": "subscriptions",
+    "displayName": "Subscription",
+    "description": "Stripe subscription records"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "stripeCustomerId": {
+      "type": "string"
+    },
+    "stripeSubscriptionId": {
+      "type": "string"
+    },
+    "plan": {
+      "type": "enumeration",
+      "enum": ["monthly"],
+      "default": "monthly"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["active", "cancelled", "past_due", "expired"],
+      "default": "active"
+    },
+    "currentPeriodStart": {
+      "type": "datetime"
+    },
+    "currentPeriodEnd": {
+      "type": "datetime"
+    }
+  }
+}

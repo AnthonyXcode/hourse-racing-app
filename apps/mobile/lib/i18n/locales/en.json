@@ -1,0 +1,112 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "back": "Back",
+    "noData": "No data available"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "register": "Register",
+    "phone": "Phone number (e.g. +852...)",
+    "username": "Username",
+    "otp": "Enter OTP",
+    "sendOtp": "Send OTP",
+    "sending": "Sending...",
+    "verify": "Verify & Sign In",
+    "verifying": "Verifying...",
+    "createAccount": "Create Account",
+    "creating": "Creating...",
+    "changeNumber": "Change number",
+    "codeSentTo": "Enter the code sent to {{phone}}",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "signInWith": "Sign in with your phone number",
+    "joinMessage": "Join to get racing suggestions",
+    "otpFailed": "Failed to send OTP",
+    "invalidOtp": "Invalid OTP",
+    "regFailed": "Registration failed",
+    "recaptchaFailed": "reCAPTCHA failed. Please try again."
+  },
+  "home": {
+    "welcome": "Welcome to HK Racing Tips",
+    "welcomeBack": "Welcome back,",
+    "tagline": "Get AI-powered racing suggestions based on Monte Carlo simulations.",
+    "nextMeeting": "Next Meeting",
+    "noFixtures": "No upcoming fixtures",
+    "venue": "Venue: {{venue}}",
+    "accuracy": "Suggestion Accuracy",
+    "hitRate": "Hit Rate",
+    "correct": "Correct",
+    "total": "Total",
+    "noDataYet": "No data yet",
+    "pastResults": "Past Results",
+    "upcoming": "Upcoming"
+  },
+  "past": {
+    "title": "Past Suggestions",
+    "noPast": "No past suggestions yet",
+    "picks": "Picks: {{picks}}"
+  },
+  "upcoming": {
+    "title": "Upcoming",
+    "signInRequired": "Sign in to view suggestions",
+    "premiumFeature": "Premium Feature",
+    "premiumDesc": "Subscribe to unlock upcoming race suggestions powered by Monte Carlo simulation.",
+    "noUpcoming": "No upcoming suggestions available"
+  },
+  "race": {
+    "notFound": "Race not found",
+    "draw": "Draw: {{value}}",
+    "weight": "Wt: {{value}}lb",
+    "rating": "Rtg: {{value}}",
+    "age": "Age: {{value}}",
+    "win": "Win",
+    "place": "Place",
+    "expPos": "Exp. Pos",
+    "class": "Class {{value}}"
+  },
+  "profile": {
+    "title": "Profile",
+    "notSignedIn": "Not signed in",
+    "upgrade": "Upgrade to Premium",
+    "upgradeDesc": "Unlock upcoming race suggestions, powered by Monte Carlo simulation analysis.",
+    "subscription": "Subscription",
+    "activeDesc": "You have an active premium subscription.",
+    "manage": "Manage Subscription"
+  },
+  "subscribe": {
+    "title": "Premium Subscription",
+    "desc": "Get AI-powered racing suggestions for upcoming meetings.",
+    "monthly": "Monthly",
+    "subscribeNow": "Subscribe Now",
+    "openingCheckout": "Opening checkout...",
+    "cancelNote": "You can cancel anytime from your profile. Powered by Stripe.",
+    "confirming": "Confirming your subscription...",
+    "cancelled": "Checkout Cancelled",
+    "cancelledDesc": "You can subscribe anytime from your profile.",
+    "goBack": "Go Back",
+    "failedCheckout": "Failed to start checkout",
+    "features": {
+      "suggestions": "Win, Place & Trio suggestions",
+      "analysis": "Monte Carlo simulation analysis",
+      "racecard": "Full racecard with probabilities",
+      "tracking": "Accuracy tracking & history"
+    }
+  },
+  "suggestion": {
+    "win": "Win",
+    "place": "Place",
+    "trio": "Trio"
+  },
+  "tabs": {
+    "home": "Home",
+    "past": "Past",
+    "upcoming": "Upcoming",
+    "profile": "Profile"
+  }
+}

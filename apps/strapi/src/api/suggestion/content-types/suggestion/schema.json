@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "suggestions",
+  "info": {
+    "singularName": "suggestion",
+    "pluralName": "suggestions",
+    "displayName": "Suggestion",
+    "description": "Racing suggestions derived from analysis"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "Format: yyyy-MM-dd_VV_RN_type e.g. 2026-04-06_ST_R1_win"
+    },
+    "meeting": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::meeting.meeting"
+    },
+    "analysis": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::analysis.analysis"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": ["win", "place", "trio"],
+      "required": true
+    },
+    "picks": {
+      "type": "json",
+      "description": "Array of { horseNumber, horseName, horseCode }"
+    },
+    "result": {
+      "type": "enumeration",
+      "enum": ["pending", "correct", "partial", "incorrect"],
+      "default": "pending"
+    },
+    "raceDate": {
+      "type": "date",
+      "required": true
+    }
+  }
+}

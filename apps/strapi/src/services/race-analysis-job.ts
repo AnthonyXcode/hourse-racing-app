@@ -7,6 +7,7 @@
 
 import { format } from 'date-fns';
 import { analyzeRaceByKey } from './race-analyzer';
+import { generateSuggestionsForAnalysis } from './suggestion-generator';
 
 function analysisName(meetingKey: string): string {
   const now = format(new Date(), 'yyyyMMddHHmmss');
@@ -27,7 +28,7 @@ export async function runAnalysisForMeeting(
 
   const name = analysisName(meetingKey);
 
-  await documents('api::analysis.analysis').create({
+  const analysisDoc = await documents('api::analysis.analysis').create({
     data: {
       name,
       meeting: meetingDocumentId,
@@ -45,6 +46,19 @@ export async function runAnalysisForMeeting(
       analyzedAt: new Date().toISOString(),
     },
   });
+
+  try {
+    const populated = await documents('api::analysis.analysis').findOne({
+      documentId: analysisDoc.documentId,
+      populate: { results: true, meeting: true },
+    });
+    if (populated) {
+      const count = await generateSuggestionsForAnalysis(populated);
+      strapi.log.info(`race-analysis: generated ${count} suggestions for ${meetingKey}`);
+    }
+  } catch (e) {
+    strapi.log.error(`race-analysis: suggestion generation failed for ${meetingKey}: ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   strapi.log.info(`race-analysis: ${meetingKey} done → ${name} (${results.length} runners)`);
   return { name };
