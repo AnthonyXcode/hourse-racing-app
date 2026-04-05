@@ -39,7 +39,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F1F5F9' }} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-        <Card padded elevate bordered>
+        <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$3">
             <YStack gap="$1">
               <H3>{user?.username}</H3>
@@ -62,7 +62,7 @@ export default function ProfileScreen() {
         </Card>
 
         {!isPaid ? (
-          <Card padded elevate bordered>
+          <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
             <YStack gap="$2">
               <Text fontWeight="bold" fontSize="$5">{t('profile.upgrade')}</Text>
               <Paragraph color="$gray11">
@@ -74,7 +74,7 @@ export default function ProfileScreen() {
             </YStack>
           </Card>
         ) : (
-          <Card padded elevate bordered>
+          <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
             <YStack gap="$2">
               <Text fontWeight="bold" fontSize="$5">{t('profile.subscription')}</Text>
               <Paragraph color="$gray11">{t('profile.activeDesc')}</Paragraph>
@@ -82,9 +82,8 @@ export default function ProfileScreen() {
                 size="$4"
                 variant="outlined"
                 onPress={async () => {
-                  const { getApiClient: getClient } = await import('../../lib/api');
-                  const client = await getClient();
-                  const res = await client.post<{ url: string }>('/subscriptions/portal');
+                  const { strapi: s } = await import('../../lib/api');
+                  const res = await s.post<{ url: string }>('/subscriptions/portal');
                   if (res.url) {
                     const Linking = await import('expo-linking');
                     Linking.openURL(res.url);
@@ -97,7 +96,7 @@ export default function ProfileScreen() {
           </Card>
         )}
 
-        <Card padded elevate bordered>
+        <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$2">
             <Text fontWeight="bold" fontSize="$5">Language / 語言</Text>
             <XStack gap="$2">

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import Recaptcha, { type RecaptchaRef } from 'react-native-recaptcha-that-works';
 import { useAuth } from '../../lib/auth';
-import { getApiClient } from '../../lib/api';
+import { strapi } from '../../lib/api';
 
 const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY || '';
 const RECAPTCHA_BASE_URL = process.env.EXPO_PUBLIC_RECAPTCHA_BASE_URL || 'https://www.google.com';
@@ -35,8 +35,7 @@ export default function RegisterScreen() {
     setError('');
     setLoading(true);
     try {
-      const client = await getApiClient();
-      await client.post('/auth-otp/send', { phone, recaptchaToken: token });
+      await strapi.post('/auth-otp/send', { phone, recaptchaToken: token });
       setStep('otp');
     } catch (e: any) {
       setError(e.message || t('auth.otpFailed'));

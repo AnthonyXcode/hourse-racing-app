@@ -5,7 +5,7 @@ import { FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { getApiClient } from '../../lib/api';
+import { strapi } from '../../lib/api';
 
 export default function UpcomingScreen() {
   const { t } = useTranslation();
@@ -16,9 +16,8 @@ export default function UpcomingScreen() {
     queryKey: ['upcomingSuggestions'],
     enabled: isPaid,
     queryFn: async () => {
-      const client = await getApiClient();
       const today = new Date().toISOString().slice(0, 10);
-      const res = await client.find<{ data: any[] }>('suggestions', {
+      const res = await strapi.find<{ data: any[] }>('suggestions', {
         filters: { raceDate: { $gte: today }, result: 'pending' },
         sort: ['raceDate:asc', 'name:asc'],
         populate: 'meeting',
@@ -79,9 +78,10 @@ export default function UpcomingScreen() {
         }
         renderItem={({ item }) => (
           <Card
-            padded
-            elevate
-            bordered
+            padding="$4"
+            borderWidth={1}
+            borderColor="$borderColor"
+            borderRadius="$4"
             pressStyle={{ scale: 0.98 }}
             onPress={() => router.push(`/race/${item.meeting?.key}`)}
           >

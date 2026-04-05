@@ -1,11 +1,15 @@
-import { createApiClient, type ApiClient } from '@horse-racing/api-client';
+import { OpenAPI, request, type CancelablePromise } from '@horse-racing/api-client';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const STRAPI_URL = process.env.EXPO_PUBLIC_STRAPI_URL || 'http://localhost:1337/api';
 const TOKEN_KEY = 'auth_jwt';
 
-let clientInstance: ApiClient | null = null;
+OpenAPI.BASE = STRAPI_URL;
+OpenAPI.TOKEN = async () => {
+  const token = await getAuthToken();
+  return token ?? '';
+};
 
 export async function getAuthToken(): Promise<string | null> {
   if (Platform.OS === 'web') {
@@ -20,7 +24,6 @@ export async function setAuthToken(token: string): Promise<void> {
   } else {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
   }
-  clientInstance = null;
 }
 
 export async function removeAuthToken(): Promise<void> {
@@ -29,19 +32,57 @@ export async function removeAuthToken(): Promise<void> {
   } else {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
   }
-  clientInstance = null;
 }
 
-export async function getApiClient(): Promise<ApiClient> {
-  if (clientInstance) return clientInstance;
-  const token = await getAuthToken();
-  clientInstance = createApiClient({
-    baseURL: STRAPI_URL,
-    ...(token ? { token } : {}),
-  });
-  return clientInstance;
-}
+/**
+ * Strapi content-type query helpers built on the generated OpenAPI `request`.
+ */
+export const strapi = {
+  find<T = any>(
+    contentType: string,
+    params?: {
+      filters?: Record<string, unknown>;
+      populate?: string | string[] | Record<string, unknown>;
+      sort?: string | string[];
+      pagination?: { page?: number; pageSize?: number; start?: number; limit?: number };
+      fields?: string[];
+      locale?: string;
+    },
+  ): CancelablePromise<T> {
+    return request(OpenAPI, {
+      method: 'GET',
+      url: `/${contentType}`,
+      query: params as Record<string, unknown>,
+    });
+  },
 
-export function resetApiClient(): void {
-  clientInstance = null;
-}
+  findOne<T = any>(
+    contentType: string,
+    id: number | string,
+    params?: { populate?: string | Record<string, unknown> },
+  ): CancelablePromise<T> {
+    return request(OpenAPI, {
+      method: 'GET',
+      url: `/${contentType}/{id}`,
+      path: { id: String(id) },
+      query: params as Record<string, unknown>,
+    });
+  },
+
+  post<T = any>(url: string, body?: unknown): CancelablePromise<T> {
+    return request(OpenAPI, {
+      method: 'POST',
+      url,
+      body,
+      mediaType: 'application/json',
+    });
+  },
+
+  get<T = any>(url: string, query?: Record<string, unknown>): CancelablePromise<T> {
+    return request(OpenAPI, {
+      method: 'GET',
+      url,
+      query,
+    });
+  },
+};

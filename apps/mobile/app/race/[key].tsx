@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { getApiClient } from '../../lib/api';
+import { strapi } from '../../lib/api';
 
 export default function RaceDetailScreen() {
   const { t } = useTranslation();
@@ -13,8 +13,7 @@ export default function RaceDetailScreen() {
   const { data: meeting, isLoading } = useQuery({
     queryKey: ['meeting', key],
     queryFn: async () => {
-      const client = await getApiClient();
-      const res = await client.find<{ data: any[] }>('meetings', {
+      const res = await strapi.find<{ data: any[] }>('meetings', {
         filters: { key: { $eq: key } },
         populate: { runners: { populate: ['jockey', 'trainer'] } },
       });
@@ -26,8 +25,7 @@ export default function RaceDetailScreen() {
   const { data: analysis } = useQuery({
     queryKey: ['analysis', key],
     queryFn: async () => {
-      const client = await getApiClient();
-      const res = await client.find<{ data: any[] }>('analyses', {
+      const res = await strapi.find<{ data: any[] }>('analyses', {
         filters: { name: { $startsWith: key } },
         sort: ['analyzedAt:desc'],
         populate: 'results',
@@ -77,7 +75,7 @@ export default function RaceDetailScreen() {
         }}
       />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Card padded bordered>
+        <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$1">
             <H4>{meeting.raceName || `Race ${meeting.raceNumber}`}</H4>
             <XStack gap="$3" flexWrap="wrap">
@@ -94,7 +92,7 @@ export default function RaceDetailScreen() {
           .map((runner: any) => {
             const analysisResult = resultMap.get(runner.horseNumber);
             return (
-              <Card key={runner.horseNumber} padded bordered elevate>
+              <Card key={runner.horseNumber} padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
                 <YStack gap="$2">
                   <XStack justifyContent="space-between" alignItems="center">
                     <XStack gap="$2" alignItems="center">

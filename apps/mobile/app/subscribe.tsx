@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { getApiClient } from '../lib/api';
+import { strapi } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 export default function SubscribeScreen() {
@@ -41,8 +41,7 @@ export default function SubscribeScreen() {
     setError('');
     setLoading(true);
     try {
-      const client = await getApiClient();
-      const res = await client.post<{ url: string }>('/subscriptions/checkout');
+      const res = await strapi.post<{ url: string }>('/subscriptions/checkout');
       if (res.url) {
         await Linking.openURL(res.url);
       }

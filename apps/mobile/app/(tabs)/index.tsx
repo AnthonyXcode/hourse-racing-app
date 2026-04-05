@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { getApiClient } from '../../lib/api';
+import { strapi } from '../../lib/api';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -17,9 +17,8 @@ export default function HomeScreen() {
   const { data: nextFixture, isLoading, refetch } = useQuery({
     queryKey: ['nextFixture'],
     queryFn: async () => {
-      const client = await getApiClient();
       const today = new Date().toISOString().slice(0, 10);
-      const res = await client.find<{ data: any[] }>('fixtures', {
+      const res = await strapi.find<{ data: any[] }>('fixtures', {
         filters: { raceDate: { $gte: today } },
         sort: ['raceDate:asc'],
         pagination: { pageSize: 1 },
@@ -31,8 +30,7 @@ export default function HomeScreen() {
   const { data: accuracyStats } = useQuery({
     queryKey: ['accuracyStats'],
     queryFn: async () => {
-      const client = await getApiClient();
-      const res = await client.find<{ data: any[] }>('suggestions', {
+      const res = await strapi.find<{ data: any[] }>('suggestions', {
         filters: { result: { $ne: 'pending' } },
         pagination: { pageSize: 200 },
       });
@@ -52,7 +50,7 @@ export default function HomeScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A1628' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A1628' }} edges={['bottom']}>
         <YStack flex={1} justifyContent="center" alignItems="center" padding="$4" gap="$4">
           <H3 color="white">{t('home.welcome')}</H3>
           <Paragraph color="$gray10" textAlign="center">
@@ -61,8 +59,8 @@ export default function HomeScreen() {
           <Button size="$5" theme="active" onPress={() => router.push('/(auth)/login')}>
             {t('auth.signIn')}
           </Button>
-          <Button size="$4" variant="outlined" onPress={() => router.push('/(auth)/register')}>
-            {t('auth.createAccount')}
+          <Button size="$4" variant="outlined" theme="gray" borderColor="$gray8" onPress={() => router.push('/(auth)/register')}>
+            <Text color="white">{t('auth.createAccount')}</Text>
           </Button>
         </YStack>
       </SafeAreaView>
@@ -81,7 +79,7 @@ export default function HomeScreen() {
           <H3>{user?.username ?? 'User'}</H3>
         </YStack>
 
-        <Card padded elevate bordered>
+        <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$2">
             <Text fontWeight="bold" fontSize="$5">{t('home.nextMeeting')}</Text>
             {isLoading ? (
@@ -97,7 +95,7 @@ export default function HomeScreen() {
           </YStack>
         </Card>
 
-        <Card padded elevate bordered>
+        <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$2">
             <Text fontWeight="bold" fontSize="$5">{t('home.accuracy')}</Text>
             {accuracyStats ? (
@@ -124,13 +122,13 @@ export default function HomeScreen() {
         </Card>
 
         <XStack gap="$3">
-          <Card padded elevate bordered flex={1} pressStyle={{ scale: 0.97 }} onPress={() => router.push('/(tabs)/past')}>
+          <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4" flex={1} pressStyle={{ scale: 0.97 }} onPress={() => router.push('/(tabs)/past')}>
             <YStack alignItems="center" gap="$1">
               <Text fontSize={32}>📊</Text>
               <Text fontWeight="bold">{t('home.pastResults')}</Text>
             </YStack>
           </Card>
-          <Card padded elevate bordered flex={1} pressStyle={{ scale: 0.97 }} onPress={() => router.push('/(tabs)/upcoming')}>
+          <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4" flex={1} pressStyle={{ scale: 0.97 }} onPress={() => router.push('/(tabs)/upcoming')}>
             <YStack alignItems="center" gap="$1">
               <Text fontSize={32}>🏇</Text>
               <Text fontWeight="bold">{t('home.upcoming')}</Text>

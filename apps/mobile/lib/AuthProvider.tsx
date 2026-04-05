@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { UsersPermissionsUsersRolesService } from '@horse-racing/api-client';
 import { AuthContext, type User } from './auth';
-import { getApiClient, getAuthToken, removeAuthToken, resetApiClient, setAuthToken } from './api';
+import { strapi, getAuthToken, removeAuthToken, setAuthToken } from './api';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -14,10 +15,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const client = await getApiClient();
-      const res = await client.get<{ id: number; username: string; phone: string; subscriptionStatus: string }>(
-        '/users/me',
-      );
+      const res = await UsersPermissionsUsersRolesService.getUsersMe() as any;
       setUser({
         id: res.id,
         username: res.username,
@@ -37,10 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   const login = useCallback(async (phone: string, otp: string) => {
-    const client = await getApiClient();
-    const res = await client.post<{ jwt: string; user: any }>('/auth-otp/verify', { phone, otp });
+    const res = await strapi.post<{ jwt: string; user: any }>('/auth-otp/verify', { phone, otp });
     await setAuthToken(res.jwt);
-    resetApiClient();
     setUser({
       id: res.user.id,
       username: res.user.username,
@@ -50,10 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const register = useCallback(async (phone: string, username: string, otp: string) => {
-    const client = await getApiClient();
-    const res = await client.post<{ jwt: string; user: any }>('/auth-otp/register', { phone, username, otp });
+    const res = await strapi.post<{ jwt: string; user: any }>('/auth-otp/register', { phone, username, otp });
     await setAuthToken(res.jwt);
-    resetApiClient();
     setUser({
       id: res.user.id,
       username: res.user.username,
@@ -64,7 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await removeAuthToken();
-    resetApiClient();
     setUser(null);
   }, []);
 

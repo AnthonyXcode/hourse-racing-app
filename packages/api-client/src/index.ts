@@ -3,3 +3,4 @@
 
 export * from './client'
 export * from './generated'
+export { request } from './generated/core/request'

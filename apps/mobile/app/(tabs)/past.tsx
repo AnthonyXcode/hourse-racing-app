@@ -3,7 +3,7 @@ import { YStack, Text, Card, Paragraph, Spinner, XStack } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { getApiClient } from '../../lib/api';
+import { strapi } from '../../lib/api';
 
 const RESULT_COLORS: Record<string, string> = {
   correct: '$green10',
@@ -18,9 +18,8 @@ export default function PastScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['pastSuggestions'],
     queryFn: async () => {
-      const client = await getApiClient();
       const today = new Date().toISOString().slice(0, 10);
-      const res = await client.find<{ data: any[] }>('suggestions', {
+      const res = await strapi.find<{ data: any[] }>('suggestions', {
         filters: { raceDate: { $lt: today } },
         sort: ['raceDate:desc'],
         populate: 'meeting',
@@ -52,7 +51,7 @@ export default function PastScreen() {
           </YStack>
         }
         renderItem={({ item }) => (
-          <Card padded elevate bordered>
+          <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
             <YStack gap="$2">
               <XStack justifyContent="space-between" alignItems="center">
                 <Text fontWeight="bold">{item.raceDate}</Text>
