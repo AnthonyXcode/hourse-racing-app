@@ -110,13 +110,18 @@ const hkjcSyncTriggerResponses = {
   },
 };
 
-function hkjcTriggerPost(summary: string, description: string, operationId: string) {
+function hkjcTriggerPost(
+  summary: string,
+  description: string,
+  operationId: string,
+  extraParameters?: Record<string, unknown>[]
+) {
   return {
     tags: ['HKJC'],
     summary,
     description,
     operationId,
-    parameters: hkjcSyncTriggerParameters,
+    parameters: [...hkjcSyncTriggerParameters, ...(extraParameters ?? [])],
     responses: hkjcSyncTriggerResponses,
   };
 }
@@ -134,8 +139,31 @@ const hkjcSyncOpenApiOverride = {
     '/hkjc-sync/trigger/meetings': {
       post: hkjcTriggerPost(
         'Trigger HKJC meetings job',
-        'Loads fixture dates from the Fixture collection and creates missing Meeting rows. Requires `HKJC_SYNC_TRIGGER_SECRET` (min 8 characters). Send the same value in header `x-hkjc-sync-secret` or query `secret`. Returns 503 if the secret is not configured.',
-        'postHkjcSyncTriggerMeetings'
+        'Scrapes HKJC racecard / results pages and upserts Meeting rows. Without parameters it processes all fixture dates; with parameters it targets a specific race. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
+        'postHkjcSyncTriggerMeetings',
+        [
+          {
+            name: 'date',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', example: '2026-04-06' },
+            description: 'Target race date in `yyyy-MM-dd` format.',
+          },
+          {
+            name: 'venue',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['ST', 'HV'] },
+            description: 'Venue code (`ST` = Sha Tin, `HV` = Happy Valley).',
+          },
+          {
+            name: 'raceNo',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', example: '1' },
+            description: 'Race number(s). Supports single (`1`), range (`1-5`), or comma-separated (`1,3,7`).',
+          },
+        ]
       ),
     },
     '/hkjc-sync/trigger/history': {
@@ -148,8 +176,31 @@ const hkjcSyncOpenApiOverride = {
     '/hkjc-sync/trigger/analysis': {
       post: hkjcTriggerPost(
         'Trigger race analysis (Monte Carlo)',
-        'Runs Monte Carlo simulation for a meeting (via `meetingKey` query param) or all upcoming races if omitted. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
-        'postHkjcSyncTriggerAnalysis'
+        'Runs Monte Carlo simulation. Provide `date`, `venue`, and `raceNo` to target a specific race; omit all three to analyse every upcoming race that lacks an Analysis record. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
+        'postHkjcSyncTriggerAnalysis',
+        [
+          {
+            name: 'date',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', example: '2026-04-06' },
+            description: 'Target race date in `yyyy-MM-dd` format.',
+          },
+          {
+            name: 'venue',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['ST', 'HV'] },
+            description: 'Venue code (`ST` = Sha Tin, `HV` = Happy Valley).',
+          },
+          {
+            name: 'raceNo',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', example: '1' },
+            description: 'Single race number (e.g. `1`). All three params are required to target a specific race.',
+          },
+        ]
       ),
     },
     '/hkjc-sync/trigger': {

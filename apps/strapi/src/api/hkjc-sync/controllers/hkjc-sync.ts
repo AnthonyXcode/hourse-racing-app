@@ -142,10 +142,15 @@ export default {
   },
 
   async triggerAnalysis(ctx: any) {
-    const meetingKey =
-      typeof ctx.query?.meetingKey === 'string' && ctx.query.meetingKey.length > 0
-        ? ctx.query.meetingKey
-        : undefined;
+    const q = ctx.query ?? {};
+    let meetingKey: string | undefined;
+    if (
+      typeof q.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.date) &&
+      typeof q.venue === 'string' && (q.venue === 'ST' || q.venue === 'HV') &&
+      typeof q.raceNo === 'string' && /^\d{1,2}$/.test(q.raceNo)
+    ) {
+      meetingKey = `${q.date}_${q.venue}_R${q.raceNo}`;
+    }
     await runTrigger(ctx, isAnalysisJobRunning, (strapi) =>
       runAnalysisJobOnce(strapi, meetingKey),
     );

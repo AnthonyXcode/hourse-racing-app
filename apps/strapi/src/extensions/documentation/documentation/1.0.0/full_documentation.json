@@ -14,7 +14,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "x-generation-date": "2026-04-03T16:55:02.239Z"
+    "x-generation-date": "2026-04-05T08:03:09.478Z"
   },
   "x-strapi-config": {
     "plugins": [
@@ -1601,7 +1601,7 @@
           "HKJC"
         ],
         "summary": "Trigger HKJC meetings job",
-        "description": "Loads fixture dates from the Fixture collection and creates missing Meeting rows. Requires `HKJC_SYNC_TRIGGER_SECRET` (min 8 characters). Send the same value in header `x-hkjc-sync-secret` or query `secret`. Returns 503 if the secret is not configured.",
+        "description": "Scrapes HKJC racecard / results pages and upserts Meeting rows. Without parameters it processes all fixture dates; with parameters it targets a specific race. Requires `HKJC_SYNC_TRIGGER_SECRET`.",
         "operationId": "postHkjcSyncTriggerMeetings",
         "parameters": [
           {
@@ -1621,6 +1621,40 @@
               "type": "string"
             },
             "description": "Alternative to `x-hkjc-sync-secret`; same value as `HKJC_SYNC_TRIGGER_SECRET`."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2026-04-06"
+            },
+            "description": "Target race date in `yyyy-MM-dd` format."
+          },
+          {
+            "name": "venue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ST",
+                "HV"
+              ]
+            },
+            "description": "Venue code (`ST` = Sha Tin, `HV` = Happy Valley)."
+          },
+          {
+            "name": "raceNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            },
+            "description": "Race number(s). Supports single (`1`), range (`1-5`), or comma-separated (`1,3,7`)."
           }
         ],
         "responses": {
@@ -1909,7 +1943,7 @@
           "HKJC"
         ],
         "summary": "Trigger race analysis (Monte Carlo)",
-        "description": "Runs Monte Carlo simulation for a meeting (via `meetingKey` query param) or all upcoming races if omitted. Requires `HKJC_SYNC_TRIGGER_SECRET`.",
+        "description": "Runs Monte Carlo simulation. Provide `date`, `venue`, and `raceNo` to target a specific race; omit all three to analyse every upcoming race that lacks an Analysis record. Requires `HKJC_SYNC_TRIGGER_SECRET`.",
         "operationId": "postHkjcSyncTriggerAnalysis",
         "parameters": [
           {
@@ -1929,6 +1963,40 @@
               "type": "string"
             },
             "description": "Alternative to `x-hkjc-sync-secret`; same value as `HKJC_SYNC_TRIGGER_SECRET`."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2026-04-06"
+            },
+            "description": "Target race date in `yyyy-MM-dd` format."
+          },
+          {
+            "name": "venue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ST",
+                "HV"
+              ]
+            },
+            "description": "Venue code (`ST` = Sha Tin, `HV` = Happy Valley)."
+          },
+          {
+            "name": "raceNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            },
+            "description": "Single race number (e.g. `1`). All three params are required to target a specific race."
           }
         ],
         "responses": {
