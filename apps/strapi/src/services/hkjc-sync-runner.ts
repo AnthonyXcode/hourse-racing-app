@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import {
   runHkjcFixtureJob,
   runHkjcMeetingsJob,
@@ -14,6 +15,7 @@ const running = {
   meetings: false,
   history: false,
   analysis: false,
+  all: false,
 };
 
 export function isHkjcFixtureJobRunning(): boolean {
@@ -83,5 +85,48 @@ export async function runAnalysisJobOnce(
     return { started: true };
   } finally {
     running.analysis = false;
+  }
+}
+
+/**
+ * Cron wrapper: runs analysis only when today is a racing day
+ * (i.e. a Fixture exists whose raceDate matches today).
+ */
+export async function runAnalysisCronJobOnce(strapi: any): Promise<{ started: boolean }> {
+  const documents = strapi.documents;
+  if (!documents) return { started: false };
+
+  const todayIso = format(new Date(), 'yyyy-MM-dd');
+  const fixture = await documents('api::fixture.fixture').findFirst({
+    filters: { raceDate: { $eq: todayIso } },
+  });
+
+  if (!fixture) {
+    strapi.log.info(`hkjc-cron: analysis skipped — ${todayIso} is not a racing day`);
+    return { started: true };
+  }
+
+  return runAnalysisJobOnce(strapi);
+}
+
+export function isAllJobsRunning(): boolean {
+  return running.all;
+}
+
+/**
+ * Trigger all four sync jobs sequentially:
+ * fixture → meetings → history → analysis.
+ */
+export async function runAllJobsOnce(strapi: any): Promise<{ started: boolean }> {
+  if (running.all) return { started: false };
+  running.all = true;
+  try {
+    await runHkjcFixtureJobOnce(strapi);
+    await runHkjcMeetingsJobOnce(strapi);
+    await runHkjcHistoryJobOnce(strapi);
+    await runAnalysisJobOnce(strapi);
+    return { started: true };
+  } finally {
+    running.all = false;
   }
 }

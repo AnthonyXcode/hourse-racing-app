@@ -5,7 +5,7 @@ import {
   runHkjcFixtureJobOnce,
   runHkjcMeetingsJobOnce,
   runHkjcHistoryJobOnce,
-  runAnalysisJobOnce,
+  runAnalysisCronJobOnce,
 } from './services/hkjc-sync-runner';
 import { setAppStrapi } from './services/strapi-instance';
 
@@ -203,10 +203,17 @@ const hkjcSyncOpenApiOverride = {
         ]
       ),
     },
+    '/hkjc-sync/trigger/all': {
+      post: hkjcTriggerPost(
+        'Trigger all HKJC sync jobs',
+        'Runs fixture → meetings → history → analysis sequentially. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
+        'postHkjcSyncTriggerAll'
+      ),
+    },
     '/hkjc-sync/trigger': {
       post: hkjcTriggerPost(
-        'Trigger HKJC fixture job (legacy path)',
-        'Same as `POST /hkjc-sync/trigger/fixture`. Requires `HKJC_SYNC_TRIGGER_SECRET` (min 8 characters). Send the same value in header `x-hkjc-sync-secret` or query `secret`. Returns 503 if the secret is not configured.',
+        'Trigger all HKJC sync jobs (legacy path)',
+        'Same as `POST /hkjc-sync/trigger/all`. Runs fixture → meetings → history → analysis sequentially. Requires `HKJC_SYNC_TRIGGER_SECRET`.',
         'postHkjcSyncTrigger'
       ),
     },
@@ -255,18 +262,23 @@ export default {
     }
 
     const tz = process.env.HKJC_CRON_TZ || 'Asia/Hong_Kong';
-    const scheduleFixture = process.env.HKJC_CRON_FIXTURE_SCHEDULE || '0 6 * * *';
-    const scheduleMeetings = process.env.HKJC_CRON_MEETINGS_SCHEDULE || '30 6 * * *';
-    const scheduleHistory = process.env.HKJC_CRON_HISTORY_SCHEDULE || '45 6 * * *';
-    const scheduleAnalysis = process.env.HKJC_CRON_ANALYSIS_SCHEDULE || '0 7 * * *';
+    const scheduleFixture = process.env.HKJC_CRON_FIXTURE_SCHEDULE || '0 0 * * *';
+    const scheduleMeetings = process.env.HKJC_CRON_MEETINGS_SCHEDULE || '0 6 * * *';
+    const scheduleHistoryRaw = process.env.HKJC_CRON_HISTORY_SCHEDULE || '0 19 * * *,0 23 * * *';
+    const scheduleAnalysis = process.env.HKJC_CRON_ANALYSIS_SCHEDULE || '0 8 * * *';
 
     scheduleHkjcCron(strapi, 'fixture', scheduleFixture, tz, runHkjcFixtureJobOnce);
     scheduleHkjcCron(strapi, 'meetings', scheduleMeetings, tz, runHkjcMeetingsJobOnce);
-    scheduleHkjcCron(strapi, 'history', scheduleHistory, tz, runHkjcHistoryJobOnce);
-    scheduleHkjcCron(strapi, 'analysis', scheduleAnalysis, tz, (s) => runAnalysisJobOnce(s));
+
+    const historyExprs = scheduleHistoryRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    for (const expr of historyExprs) {
+      scheduleHkjcCron(strapi, 'history', expr, tz, runHkjcHistoryJobOnce);
+    }
+
+    scheduleHkjcCron(strapi, 'analysis', scheduleAnalysis, tz, runAnalysisCronJobOnce);
 
     strapi.log.info(
-      `HKJC crons: fixture "${scheduleFixture}", meetings "${scheduleMeetings}", history "${scheduleHistory}", analysis "${scheduleAnalysis}" (${tz})`
+      `HKJC crons: fixture "${scheduleFixture}", meetings "${scheduleMeetings}", history "${scheduleHistoryRaw}", analysis "${scheduleAnalysis}" (${tz})`
     );
 
     if (process.env.HKJC_CRON_RUN_ON_BOOT === 'true') {

@@ -50,18 +50,35 @@ yarn strapi deploy
 
 Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
 
-## HKJC data: when Fixture, Meeting, History, and Healthcheck update
+## HKJC Sync
 
-### Triggers
+All sync jobs are protected by `HKJC_SYNC_TRIGGER_SECRET` (min 8 chars). Pass the secret via the `x-hkjc-sync-secret` header or the `secret` query parameter.
 
-| When | What runs |
-|------|-----------|
-| **App bootstrap** | Optional **Fixture** row creation from `data/fixtures.seed.json` via `seedFixtureFromSeedFile` (skipped if `HKJC_FIXTURE_SYNC_ON_BOOT=false`). |
-| **Cron** | Three jobs (disabled if `HKJC_CRON_ENABLED=false`): fixture `HKJC_CRON_FIXTURE_SCHEDULE` (default `0 6 * * *`), meetings `HKJC_CRON_MEETINGS_SCHEDULE` (default `30 6 * * *`), history `HKJC_CRON_HISTORY_SCHEDULE` (default `45 6 * * *`). Time zone: `HKJC_CRON_TZ` (default `Asia/Hong_Kong`). |
-| **After listen (optional)** | Fixture job only if `HKJC_CRON_RUN_ON_BOOT=true` (meetings/history still follow cron). |
-| **HTTP** | `POST /api/hkjc-sync/trigger/fixture`, `.../meetings`, `.../history` with `x-hkjc-sync-secret` (when `HKJC_SYNC_TRIGGER_SECRET` is set). Legacy `POST /api/hkjc-sync/trigger` is the same as fixture. |
+Each job type has its own lock — a second trigger for the same job while it is already running returns **409**. Other job types can still run concurrently.
 
-Each job type is serialized separately: a second trigger for the same job while it is running returns 409; the other two jobs can still run.
+### Cron schedule
+
+Crons are disabled when `HKJC_CRON_ENABLED=false`. Time zone: `HKJC_CRON_TZ` (default `Asia/Hong_Kong`).
+
+| Job | Default schedule | Env override | What it does |
+|-----|-----------------|--------------|--------------|
+| **Fixture** | `0 0 * * *` (midnight daily) | `HKJC_CRON_FIXTURE_SCHEDULE` | Scrapes the HKJC fixture calendar and creates missing Fixture rows. |
+| **Meetings** | `0 6 * * *` (6 am daily) | `HKJC_CRON_MEETINGS_SCHEDULE` | Fetches all races for the latest meeting date in the Fixture list (racecard + jockey/trainer/horse profile + past performances). |
+| **History** | `0 19 * * *,0 23 * * *` (7 pm & 11 pm daily) | `HKJC_CRON_HISTORY_SCHEDULE` | Scrapes HKJC local results for past fixture dates that have no History record yet. Comma-separated for multiple schedules. |
+| **Analysis** | `0 8 * * *` (8 am daily) | `HKJC_CRON_ANALYSIS_SCHEDULE` | Runs Monte Carlo simulation for all races — **only** when today is a racing day (a Fixture exists for today). |
+
+### HTTP trigger endpoints
+
+All endpoints are `POST /api/hkjc-sync/trigger/...`.
+
+| Endpoint | Parameters | Description |
+|----------|-----------|-------------|
+| `/trigger/all` | — | Runs **all four** jobs sequentially: fixture → meetings → history → analysis. |
+| `/trigger/fixture` | — | Fetches HKJC fixture calendar and creates missing Fixture rows. |
+| `/trigger/meetings` | `date` (yyyy-MM-dd), `venue` (ST\|HV), `raceNo` (1, 1-5, 1,3,7) | Scrapes racecard / results and upserts Meeting rows. Without params, processes the latest fixture date. |
+| `/trigger/history` | — | Scrapes HKJC local results for past fixtures without History records. |
+| `/trigger/analysis` | `date` (yyyy-MM-dd), `venue` (ST\|HV), `raceNo` (single number) | Runs Monte Carlo analysis. All three params required for a specific race; omit all to analyse every upcoming race. |
+| `/trigger` | — | Legacy path — same as `/trigger/all`. |
 
 ### Sequence diagram
 
@@ -75,10 +92,12 @@ sequenceDiagram
   participant Fj as Fixture job
   participant Mj as Meetings job
   participant Hj as History job
+  participant Aj as Analysis job
   participant Hc as Healthcheck
   participant Web as HKJC site
   participant Mt as Meeting
   participant Hi as History
+  participant An as Analysis
 
   rect rgb(245, 250, 255)
     Note over Boot, Fx: Once per process start (independent of cron)
@@ -88,7 +107,7 @@ sequenceDiagram
     end
   end
 
-  Trig->>Fj: 6:00 cron / boot / POST .../trigger/fixture
+  Trig->>Fj: 00:00 cron / boot / POST .../trigger/fixture
   Fj->>Hc: jobName hkjc_fixture
   alt fixture fetch enabled and succeeds
     Fj->>Web: Playwright fixture scrape
@@ -97,29 +116,36 @@ sequenceDiagram
   end
   Fj->>Hc: update status, metrics
 
-  Trig->>Mj: 6:30 cron / POST .../trigger/meetings
+  Trig->>Mj: 06:00 cron / POST .../trigger/meetings
   Mj->>Hc: jobName hkjc_meetings
-  Mj->>Fx: load fixture list
-  loop each date or venue slot
-    Mj->>Mt: create if no row for key
+  Mj->>Fx: load fixture list (latest date)
+  loop each race in the latest meeting
+    Mj->>Web: scrape racecard / results
+    Mj->>Mt: upsert Meeting with runners, jockeys, trainers
   end
   Mj->>Hc: update status, metrics
 
-  Trig->>Hj: 6:45 cron / POST .../trigger/history
+  Trig->>Hj: 19:00 & 23:00 cron / POST .../trigger/history
   Hj->>Hc: jobName hkjc_history
   Hj->>Fx: load fixture list
   opt historical sync enabled
-    Note over Hj, Hi: Past dates only; capped by HKJC_HISTORICAL_MAX_PER_RUN
-    loop missing past Meeting with no History
+    loop past fixtures without History
       Hj->>Web: scrape local results (Playwright)
-      Hj->>Hi: create linked History plus results components
-      Hj->>Mt: update scrapeStatus, lastScrapedAt
+      Hj->>Hi: create History record
     end
   end
   Hj->>Hc: update status, metrics
+
+  Trig->>Aj: 08:00 cron (racing days only) / POST .../trigger/analysis
+  alt today is a racing day
+    Aj->>Mt: load upcoming meetings
+    loop each meeting without Analysis
+      Aj->>An: Monte Carlo simulation → create Analysis
+    end
+  end
 ```
 
-On **fatal errors** inside the job, **Healthcheck** is updated to `failure` with whatever **metrics** (phase list) were collected so far. **History** is only created when a past **Meeting** exists, has no **History** yet, and scraping succeeds (see `HKJC_HISTORICAL_SYNC_ENABLED` and related env vars in code).
+On **fatal errors** inside the job, **Healthcheck** is updated to `failure` with whatever **metrics** (phase list) were collected so far.
 
 ## ✨ Community
 

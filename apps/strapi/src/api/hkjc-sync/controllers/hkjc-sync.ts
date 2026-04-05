@@ -3,10 +3,12 @@ import {
   runHkjcMeetingsJobOnce,
   runHkjcHistoryJobOnce,
   runAnalysisJobOnce,
+  runAllJobsOnce,
   isHkjcFixtureJobRunning,
   isHkjcMeetingsJobRunning,
   isHkjcHistoryJobRunning,
   isAnalysisJobRunning,
+  isAllJobsRunning,
 } from '../../../services/hkjc-sync-runner';
 import { getAppStrapi } from '../../../services/strapi-instance';
 import type { MeetingsJobOptions } from '../../../services/hkjc-daily-job';
@@ -121,9 +123,13 @@ async function runTrigger(
 }
 
 export default {
-  /** Legacy path: same as `triggerFixture`. */
+  async triggerAll(ctx: any) {
+    await runTrigger(ctx, isAllJobsRunning, runAllJobsOnce);
+  },
+
+  /** Legacy path: now runs all jobs (fixture → meetings → history → analysis). */
   async trigger(ctx: any) {
-    await runTrigger(ctx, isHkjcFixtureJobRunning, runHkjcFixtureJobOnce);
+    await runTrigger(ctx, isAllJobsRunning, runAllJobsOnce);
   },
 
   async triggerFixture(ctx: any) {
