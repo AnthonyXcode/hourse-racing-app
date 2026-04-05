@@ -1,4 +1,4 @@
-import { parse } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { fetchHkjcFixtures } from './hkjc-fixture-fetch';
 import { HistoricalScraper } from './hkjc-historical-scraper';
 import { syncMissingMeetingHistories } from './hkjc-historical-sync';
@@ -38,14 +38,16 @@ function dedupeMeetingRows(rows: MeetingRow[]): MeetingRow[] {
   return out;
 }
 
-/** Max `raceDate` among fixture slots (ISO yyyy-MM-dd). */
-function latestFixtureDate(slots: MeetingRow[]): string | null {
-  let max: string | null = null;
+/** Nearest fixture date on or after today (ISO yyyy-MM-dd). */
+function nearestUpcomingFixtureDate(slots: MeetingRow[]): string | null {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  let best: string | null = null;
   for (const s of slots) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) continue;
-    if (max == null || s.date > max) max = s.date;
+    if (s.date < today) continue;
+    if (best == null || s.date < best) best = s.date;
   }
-  return max;
+  return best;
 }
 
 function normalizeRaceDate(value: unknown): string {
@@ -311,9 +313,9 @@ export async function runHkjcMeetingsJob(
     if (!targetDate) {
       const meetingsRaw = await loadAllFixtureMeetings(documents);
       const meetings = dedupeMeetingRows(meetingsRaw);
-      const latest = latestFixtureDate(meetings);
+      const latest = nearestUpcomingFixtureDate(meetings);
       if (!latest) {
-        phases.push({ name: 'detect_date', status: 'skipped', detail: 'No fixture dates found' });
+        phases.push({ name: 'detect_date', status: 'skipped', detail: 'No upcoming fixture dates found' });
         await documents('api::healthcheck.healthcheck').update({
           documentId: hcId,
           data: {
