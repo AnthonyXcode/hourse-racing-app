@@ -1,37 +1,41 @@
 {
-  "name": "hourse-racing-app",
-  "private": true,
-  "packageManager": "pnpm@9.15.4",
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "start": "turbo run start",
-    "lint": "turbo run lint",
-    "tsc": "turbo run tsc",
-    "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules",
-    "strapi": "npm run -w @horse-racing/strapi",
-    "dev:strapi": "npm run dev -w @horse-racing/strapi",
-    "build:strapi": "npm run build -w @horse-racing/strapi",
-    "start:strapi": "npm run start -w @horse-racing/strapi",
-    "mobile": "npm run -w @horse-racing/mobile",
-    "dev:mobile": "npm run dev -w @horse-racing/mobile",
-    "build:mobile": "npm run build -w @horse-racing/mobile",
-    "start:mobile": "npm run start -w @horse-racing/mobile"
-  },
-  "devDependencies": {
-    "turbo": "^2.4.4"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "pnpm": {
-    "packageExtensions": {
-      "@strapi/core": {
-        "dependencies": {
-          "bcryptjs": "2.4.3"
+    "name": "hourse-racing-app",
+    "private": true,
+    "packageManager": "pnpm@9.15.4",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "build": "turbo run build",
+        "dev": "turbo run dev",
+        "start": "turbo run start",
+        "lint": "turbo run lint",
+        "tsc": "turbo run tsc",
+        "test": "turbo run test",
+        "clean": "turbo run clean && rm -rf node_modules",
+        "strapi": "npm run -w @horse-racing/strapi",
+        "dev:strapi": "npm run dev -w @horse-racing/strapi",
+        "build:strapi": "npm run build -w @horse-racing/strapi",
+        "start:strapi": "npm run start -w @horse-racing/strapi",
+        "mobile": "npm run -w @horse-racing/mobile",
+        "dev:mobile": "npm run dev -w @horse-racing/mobile",
+        "build:mobile": "npm run build -w @horse-racing/mobile",
+        "start:mobile": "npm run start -w @horse-racing/mobile"
+    },
+    "devDependencies": {
+        "turbo": "^2.4.4"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "pnpm": {
+        "packageExtensions": {
+            "@strapi/core": {
+                "dependencies": {
+                    "bcryptjs": "2.4.3"
+                }
+            }
         }
-      }
     }
-  }
 }
