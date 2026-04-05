@@ -1,12 +1,12 @@
 import Stripe from 'stripe';
 
-let stripeInstance: Stripe | null = null;
+let stripeInstance: ReturnType<typeof Stripe> | null = null;
 
-function getStripe(): Stripe {
+function getStripe(): ReturnType<typeof Stripe> {
   if (!stripeInstance) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY not configured');
-    stripeInstance = new Stripe(key, { apiVersion: '2025-03-31.basil' as any });
+    stripeInstance = Stripe(key, { apiVersion: '2025-03-31.basil' as any });
   }
   return stripeInstance;
 }
@@ -46,7 +46,7 @@ export async function createPortalSession(customerId: string, returnUrl: string)
   return session.url;
 }
 
-export function constructWebhookEvent(payload: string | Buffer, signature: string): Stripe.Event {
+export function constructWebhookEvent(payload: string | Buffer, signature: string) {
   const stripe = getStripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) throw new Error('STRIPE_WEBHOOK_SECRET not configured');

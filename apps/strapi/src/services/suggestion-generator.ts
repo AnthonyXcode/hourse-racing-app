@@ -76,7 +76,7 @@ export async function generateSuggestionsForAnalysis(analysisRecord: any): Promi
       await documents('api::suggestion.suggestion').update({
         documentId: existing.documentId,
         data: {
-          picks,
+          picks: picks as any,
           analysis: analysisRecord.documentId,
         },
       });
@@ -89,7 +89,7 @@ export async function generateSuggestionsForAnalysis(analysisRecord: any): Promi
         data: {
           name,
           type: type as 'win' | 'place' | 'trio',
-          picks,
+          picks: picks as any,
           result: 'pending',
           raceDate,
           meeting: meetingDoc?.documentId ?? null,

@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { sendOtp, verifyOtp } from '../../../services/twilio-otp';
 import { verifyRecaptcha } from '../../../middlewares/recaptcha';
 
@@ -93,7 +94,7 @@ export default {
         username,
         phone,
         email: `${phone.replace(/\+/g, '')}@phone.local`,
-        password: await strapi.plugin('users-permissions').service('user').hashPassword(randomPassword),
+        password: await bcrypt.hash(randomPassword, 10),
         provider: 'local',
         confirmed: true,
         blocked: false,

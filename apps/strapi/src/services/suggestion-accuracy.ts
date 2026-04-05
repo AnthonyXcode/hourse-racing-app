@@ -18,7 +18,7 @@ export async function updateSuggestionAccuracy(meetingKey: string): Promise<numb
   });
   if (!history) return 0;
 
-  const races: any[] = history.races ?? [];
+  const races: any[] = (history as any).races ?? [];
   const raceResult = races.find((r: any) => r.raceNumber === raceNo);
   if (!raceResult) return 0;
 
@@ -40,7 +40,7 @@ export async function updateSuggestionAccuracy(meetingKey: string): Promise<numb
   let updated = 0;
 
   for (const sug of suggestions) {
-    const picks: { horseNumber: number }[] = sug.picks ?? [];
+    const picks: { horseNumber: number }[] = (sug.picks as any) ?? [];
     const pickedNumbers = picks.map((p) => p.horseNumber);
     let result: 'correct' | 'partial' | 'incorrect' = 'incorrect';
 

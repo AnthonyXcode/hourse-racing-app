@@ -13,6 +13,6 @@ export async function verifyRecaptcha(token: string): Promise<boolean> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
-  const data = await res.json();
+  const data: any = await res.json();
   return data.success === true;
 }
