@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { strapi } from '../lib/api';
+import { AnalysisService } from '@horse-racing/api-client';
 import {
   latestAnalysisPerRace,
   deriveSuggestions,
@@ -24,11 +24,11 @@ export function useUpcomingAnalyses(enabled: boolean) {
     enabled,
     queryFn: async (): Promise<UpcomingItem[]> => {
       const today = new Date().toISOString().slice(0, 10);
-      const res = await strapi.find<{ data: any[] }>('analyses', {
+      const res = await AnalysisService.getAnalyses({
         filters: { analyzedAt: { $gte: today } },
-        populate: { results: true, meeting: true },
-        sort: ['analyzedAt:desc'],
-        pagination: { pageSize: 200 },
+        populate: { results: true, meeting: true } as any,
+        sort: 'analyzedAt:desc',
+        paginationPageSize: 200,
       });
       const latest = latestAnalysisPerRace(res.data ?? []);
 
@@ -44,14 +44,14 @@ export function useUpcomingAnalyses(enabled: boolean) {
         if (raceDate < today) continue;
 
         items.push({
-          analysisId: a.id?.toString() ?? a.documentId,
+          analysisId: a.id?.toString() ?? a.documentId ?? '',
           meetingKey: key,
           raceDate,
           venue,
           raceNo: parseInt(raceNoStr, 10),
           raceName: a.meeting?.raceName,
           analyzedAt: a.analyzedAt,
-          suggestions: deriveSuggestions(results),
+          suggestions: deriveSuggestions(results as any),
         });
       }
 

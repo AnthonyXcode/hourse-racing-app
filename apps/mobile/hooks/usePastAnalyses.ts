@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { strapi } from '../lib/api';
+import { AnalysisService, HistoryService } from '@horse-racing/api-client';
 import {
   latestAnalysisPerRace,
   deriveSuggestions,
@@ -26,14 +26,14 @@ export function usePastAnalyses() {
       const today = new Date().toISOString().slice(0, 10);
 
       const [analysesRes, historiesRes] = await Promise.all([
-        strapi.find<{ data: any[] }>('analyses', {
-          populate: { results: true, meeting: true },
-          sort: ['analyzedAt:desc'],
-          pagination: { pageSize: 100 },
+        AnalysisService.getAnalyses({
+          populate: { results: true, meeting: true } as any,
+          sort: 'analyzedAt:desc',
+          paginationPageSize: 100,
         }),
-        strapi.find<{ data: any[] }>('histories', {
-          sort: ['name:desc'],
-          pagination: { pageSize: 15 },
+        HistoryService.getHistories({
+          sort: 'name:desc',
+          paginationPageSize: 15,
         }),
       ]);
 
@@ -41,7 +41,7 @@ export function usePastAnalyses() {
 
       const historyMap = new Map<string, any>();
       for (const h of historiesRes.data ?? []) {
-        if (h.name) historyMap.set(h.name, h);
+        if ((h as any).name) historyMap.set((h as any).name, h);
       }
 
       const items: PastItem[] = [];
@@ -58,17 +58,17 @@ export function usePastAnalyses() {
         const raceNo = parseInt(raceNoStr, 10);
         const dv = `${raceDate}_${venue}`;
         const history = historyMap.get(dv);
-        const races: any[] = history?.races ?? [];
+        const races: any[] = (history as any)?.races ?? [];
         const raceResult = races.find((r: any) => r.raceNumber === raceNo);
         const placings = raceResult?.finishPlacings ?? [];
 
-        const suggestions = deriveSuggestions(results).map((s) => ({
+        const suggestions = deriveSuggestions(results as any).map((s) => ({
           ...s,
           result: checkAccuracy(s.type, s.picks, placings),
         }));
 
         items.push({
-          analysisId: a.id?.toString() ?? a.documentId,
+          analysisId: a.id?.toString() ?? a.documentId ?? '',
           meetingKey: key,
           raceDate,
           venue,

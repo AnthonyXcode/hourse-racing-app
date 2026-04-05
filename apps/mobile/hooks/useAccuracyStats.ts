@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { strapi } from '../lib/api';
+import { AnalysisService, HistoryService } from '@horse-racing/api-client';
 import {
   latestAnalysisPerRace,
   deriveSuggestions,
@@ -21,14 +21,14 @@ export function useAccuracyStats() {
       const today = new Date().toISOString().slice(0, 10);
 
       const [analysesRes, historiesRes] = await Promise.all([
-        strapi.find<{ data: any[] }>('analyses', {
-          populate: { results: true, meeting: true },
-          sort: ['analyzedAt:desc'],
-          pagination: { pageSize: 100 },
+        AnalysisService.getAnalyses({
+          populate: { results: true, meeting: true } as any,
+          sort: 'analyzedAt:desc',
+          paginationPageSize: 100,
         }),
-        strapi.find<{ data: any[] }>('histories', {
-          sort: ['name:desc'],
-          pagination: { pageSize: 15 },
+        HistoryService.getHistories({
+          sort: 'name:desc',
+          paginationPageSize: 15,
         }),
       ]);
 
@@ -36,7 +36,7 @@ export function useAccuracyStats() {
 
       const historyMap = new Map<string, any>();
       for (const h of historiesRes.data ?? []) {
-        if (h.name) historyMap.set(h.name, h);
+        if ((h as any).name) historyMap.set((h as any).name, h);
       }
 
       let total = 0;
@@ -55,13 +55,13 @@ export function useAccuracyStats() {
         const raceNo = parseInt(match[3], 10);
         const history = historyMap.get(dv);
         if (!history) continue;
-        const races: any[] = history.races ?? [];
+        const races: any[] = (history as any).races ?? [];
         const raceResult = races.find((r: any) => r.raceNumber === raceNo);
         if (!raceResult) continue;
         const placings = raceResult.finishPlacings ?? [];
         if (placings.length === 0) continue;
 
-        const suggestions = deriveSuggestions(results);
+        const suggestions = deriveSuggestions(results as any);
         for (const s of suggestions) {
           const acc = checkAccuracy(s.type, s.picks, placings);
           if (acc === 'pending') continue;

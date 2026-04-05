@@ -5,11 +5,25 @@ import { Platform } from 'react-native';
 const STRAPI_URL = process.env.EXPO_PUBLIC_STRAPI_URL || 'http://localhost:1337/api';
 const TOKEN_KEY = 'auth_jwt';
 
-OpenAPI.BASE = STRAPI_URL;
-OpenAPI.TOKEN = async () => {
-  const token = await getAuthToken();
-  return token ?? '';
-};
+let _initialized = false;
+
+/**
+ * Configure the shared OpenAPI client singleton.
+ * Safe to call multiple times — only the first call takes effect.
+ * Must be called before any generated service (AnalysisService, etc.) is used.
+ */
+export function initApi() {
+  if (_initialized) return;
+  OpenAPI.BASE = STRAPI_URL;
+  OpenAPI.TOKEN = async () => {
+    const token = await getAuthToken();
+    return token ?? '';
+  };
+  _initialized = true;
+}
+
+// Auto-init on import so existing code keeps working.
+initApi();
 
 export async function getAuthToken(): Promise<string | null> {
   if (Platform.OS === 'web') {

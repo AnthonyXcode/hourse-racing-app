@@ -10,6 +10,9 @@ import config from '../tamagui.config';
 import { queryClient, asyncStoragePersister } from '../lib/queryClient';
 import { AuthProvider } from '../lib/AuthProvider';
 import { initI18n, i18n } from '../lib/i18n';
+import { initApi } from '../lib/api';
+
+initApi();
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
