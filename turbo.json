@@ -1,13 +1,73 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
+    "$schema": "https://turbo.build/schema.json",
+    "tasks": {
+      "generate": {
+        "outputs": [
+          "src/generated/**"
+        ],
+        "cache": true
+      },
+      "build": {
+        "dependsOn": [
+          "^build",
+          "generate"
+        ],
+        "outputs": [
+          "dist/**",
+          "build/**",
+          ".next/**",
+          ".next-horse-racing/**",
+          ".strapi/**"
+        ],
+        "cache": true
+      },
+      "dev": {
+        "dependsOn": [
+          "generate"
+        ],
+        "cache": false,
+        "persistent": true
+      },
+      "dev:synpulse": {
+        "cache": false,
+        "persistent": true
+      },
+      "dev:synpulse8": {
+        "cache": false,
+        "persistent": true
+      },
+      "start": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false
+      },
+      "lint": {
+        "cache": true
+      },
+      "lint:fix": {
+        "cache": false
+      },
+      "tsc": {
+        "dependsOn": [
+          "^tsc"
+        ],
+        "cache": true
+      },
+      "test": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": true
+      },
+      "generate-types": {
+        "outputs": [
+          "types/generated/**"
+        ],
+        "cache": false
+      },
+      "clean": {
+        "cache": false
+      }
     }
   }
-}

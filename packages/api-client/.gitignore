@@ -1,0 +1,4 @@
+node_modules
+dist
+src/generated
+full_documentation.fixed.json

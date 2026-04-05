@@ -1,0 +1,41 @@
+{
+  "name": "@horse-racing/api-client",
+  "version": "0.1.0",
+  "description": "Auto-generated API client for Synpulse Strapi CMS",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "fix-spec": "node scripts/fix-openapi-spec.js",
+    "generate": "npm run fix-spec && openapi --input ./full_documentation.fixed.json --output ./src/generated --client fetch --useOptions && node scripts/patch-nextjs-fetch.js",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "clean": "rm -rf dist node_modules src/generated full_documentation.fixed.json",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "@horse-racing/config": "*",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9",
+    "openapi-typescript-codegen": "^0.29.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
