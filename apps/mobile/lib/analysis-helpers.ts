@@ -32,7 +32,7 @@ export function derivePlacePicks(results: HorseResult[]): DerivedPick[] {
 
 export function deriveTrioPicks(results: HorseResult[]): DerivedPick[] {
   return results
-    .filter((r) => r.placeProbability >= 0.2)
+    .filter((r) => r.placeProbability > 0.15)
     .sort((a, b) => a.ranking - b.ranking)
     .map(({ horseNumber, horseName }) => ({ horseNumber, horseName }));
 }

@@ -1,28 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
 import { YStack, Text, Card, Paragraph, Spinner, XStack } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { strapi } from '../../lib/api';
-import {
-  latestAnalysisPerRace,
-  deriveSuggestions,
-  checkAccuracy,
-  meetingKeyFromAnalysis,
-  type AccuracyResult,
-  type DerivedSuggestion,
-} from '../../lib/analysis-helpers';
-
-interface PastItem {
-  analysisId: string;
-  meetingKey: string;
-  raceDate: string;
-  venue: string;
-  raceNo: number;
-  analyzedAt: string;
-  suggestions: (DerivedSuggestion & { result: AccuracyResult })[];
-}
+import { usePastAnalyses } from '../../hooks';
 
 const RESULT_COLORS: Record<string, string> = {
   correct: '$green10',
@@ -34,70 +15,7 @@ const RESULT_COLORS: Record<string, string> = {
 export default function PastScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['pastAnalyses'],
-    queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await strapi.find<{ data: any[] }>('analyses', {
-        filters: { analyzedAt: { $lt: today } },
-        populate: { results: true, meeting: true },
-        sort: ['analyzedAt:desc'],
-        pagination: { pageSize: 200 },
-      });
-      const latest = latestAnalysisPerRace(res.data ?? []);
-
-      const dateVenueSet = new Set<string>();
-      for (const a of latest) {
-        const key = meetingKeyFromAnalysis(a);
-        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)/);
-        if (match) dateVenueSet.add(`${match[1]}_${match[2]}`);
-      }
-
-      const historyMap = new Map<string, any>();
-      for (const dv of dateVenueSet) {
-        const histRes = await strapi.find<{ data: any[] }>('histories', {
-          filters: { name: { $eq: dv } },
-          pagination: { pageSize: 1 },
-        });
-        if (histRes.data?.[0]) historyMap.set(dv, histRes.data[0]);
-      }
-
-      const items: PastItem[] = [];
-      for (const a of latest) {
-        const results = a.results ?? [];
-        if (results.length === 0) continue;
-        const key = meetingKeyFromAnalysis(a);
-        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)_R(\d+)$/);
-        if (!match) continue;
-
-        const [, raceDate, venue, raceNoStr] = match;
-        const raceNo = parseInt(raceNoStr, 10);
-        const dv = `${raceDate}_${venue}`;
-        const history = historyMap.get(dv);
-        const races: any[] = history?.races ?? [];
-        const raceResult = races.find((r: any) => r.raceNumber === raceNo);
-        const placings = raceResult?.finishPlacings ?? [];
-
-        const suggestions = deriveSuggestions(results).map((s) => ({
-          ...s,
-          result: checkAccuracy(s.type, s.picks, placings),
-        }));
-
-        items.push({
-          analysisId: a.id?.toString() ?? a.documentId,
-          meetingKey: key,
-          raceDate,
-          venue,
-          raceNo,
-          analyzedAt: a.analyzedAt,
-          suggestions,
-        });
-      }
-
-      return items.sort((a, b) => b.raceDate.localeCompare(a.raceDate) || a.raceNo - b.raceNo);
-    },
-  });
+  const { data, isLoading } = usePastAnalyses();
 
   if (isLoading) {
     return (

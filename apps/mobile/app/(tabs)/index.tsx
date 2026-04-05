@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { YStack, XStack, Text, H3, Card, Paragraph, Spinner, Button } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, RefreshControl } from 'react-native';
@@ -6,13 +5,7 @@ import { useRouter } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { strapi } from '../../lib/api';
-import {
-  latestAnalysisPerRace,
-  deriveSuggestions,
-  checkAccuracy,
-  meetingKeyFromAnalysis,
-} from '../../lib/analysis-helpers';
+import { useNextFixture, useAccuracyStats } from '../../hooks';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -20,78 +13,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: nextFixture, isLoading, refetch } = useQuery({
-    queryKey: ['nextFixture'],
-    queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await strapi.find<{ data: any[] }>('fixtures', {
-        filters: { raceDate: { $gte: today } },
-        sort: ['raceDate:asc'],
-        pagination: { pageSize: 1 },
-      });
-      return res.data?.[0] ?? null;
-    },
-  });
-
-  const { data: accuracyStats } = useQuery({
-    queryKey: ['accuracyStats'],
-    queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
-      const analysesRes = await strapi.find<{ data: any[] }>('analyses', {
-        filters: { analyzedAt: { $lt: today } },
-        populate: { results: true, meeting: true },
-        pagination: { pageSize: 200 },
-        sort: ['analyzedAt:desc'],
-      });
-      const latest = latestAnalysisPerRace(analysesRes.data ?? []);
-
-      const dateVenueSet = new Set<string>();
-      for (const a of latest) {
-        const key = meetingKeyFromAnalysis(a);
-        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)/);
-        if (match) dateVenueSet.add(`${match[1]}_${match[2]}`);
-      }
-
-      const historyMap = new Map<string, any>();
-      for (const dv of dateVenueSet) {
-        const histRes = await strapi.find<{ data: any[] }>('histories', {
-          filters: { name: { $eq: dv } },
-          pagination: { pageSize: 1 },
-        });
-        if (histRes.data?.[0]) historyMap.set(dv, histRes.data[0]);
-      }
-
-      let total = 0;
-      let correct = 0;
-      let partial = 0;
-      for (const a of latest) {
-        const results = a.results ?? [];
-        if (results.length === 0) continue;
-        const key = meetingKeyFromAnalysis(a);
-        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)_R(\d+)$/);
-        if (!match) continue;
-        const dv = `${match[1]}_${match[2]}`;
-        const raceNo = parseInt(match[3], 10);
-        const history = historyMap.get(dv);
-        if (!history) continue;
-        const races: any[] = history.races ?? [];
-        const raceResult = races.find((r: any) => r.raceNumber === raceNo);
-        if (!raceResult) continue;
-        const placings = raceResult.finishPlacings ?? [];
-        if (placings.length === 0) continue;
-
-        const suggestions = deriveSuggestions(results);
-        for (const s of suggestions) {
-          const acc = checkAccuracy(s.type, s.picks, placings);
-          if (acc === 'pending') continue;
-          total++;
-          if (acc === 'correct') correct++;
-          else if (acc === 'partial') partial++;
-        }
-      }
-      return { total, correct, partial, rate: total > 0 ? ((correct + partial * 0.5) / total) * 100 : 0 };
-    },
-  });
+  const { data: nextFixture, isLoading, refetch } = useNextFixture();
+  const { data: accuracyStats } = useAccuracyStats();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

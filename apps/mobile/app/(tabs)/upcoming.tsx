@@ -1,73 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
 import { YStack, Text, Card, Paragraph, Spinner, XStack, Button, H4 } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
-import { strapi } from '../../lib/api';
-import {
-  latestAnalysisPerRace,
-  deriveSuggestions,
-  meetingKeyFromAnalysis,
-  type DerivedSuggestion,
-} from '../../lib/analysis-helpers';
-
-interface UpcomingItem {
-  analysisId: string;
-  meetingKey: string;
-  raceDate: string;
-  venue: string;
-  raceNo: number;
-  raceName?: string;
-  analyzedAt: string;
-  suggestions: DerivedSuggestion[];
-}
+import { useUpcomingAnalyses } from '../../hooks';
 
 export default function UpcomingScreen() {
   const { t } = useTranslation();
   const { isPaid, isAuthenticated } = useAuth();
   const router = useRouter();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['upcomingAnalyses'],
-    enabled: isPaid,
-    queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await strapi.find<{ data: any[] }>('analyses', {
-        filters: { analyzedAt: { $gte: today } },
-        populate: { results: true, meeting: true },
-        sort: ['analyzedAt:desc'],
-        pagination: { pageSize: 200 },
-      });
-      const latest = latestAnalysisPerRace(res.data ?? []);
-
-      const items: UpcomingItem[] = [];
-      for (const a of latest) {
-        const results = a.results ?? [];
-        if (results.length === 0) continue;
-        const key = meetingKeyFromAnalysis(a);
-        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)_R(\d+)$/);
-        if (!match) continue;
-
-        const [, raceDate, venue, raceNoStr] = match;
-        if (raceDate < today) continue;
-
-        items.push({
-          analysisId: a.id?.toString() ?? a.documentId,
-          meetingKey: key,
-          raceDate,
-          venue,
-          raceNo: parseInt(raceNoStr, 10),
-          raceName: a.meeting?.raceName,
-          analyzedAt: a.analyzedAt,
-          suggestions: deriveSuggestions(results),
-        });
-      }
-
-      return items.sort((a, b) => a.raceDate.localeCompare(b.raceDate) || a.raceNo - b.raceNo);
-    },
-  });
+  const { data, isLoading } = useUpcomingAnalyses(isPaid);
 
   if (!isAuthenticated) {
     return (
