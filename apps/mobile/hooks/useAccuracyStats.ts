@@ -6,6 +6,7 @@ import {
   checkAccuracy,
   meetingKeyFromAnalysis,
 } from '../lib/analysis-helpers';
+import { useAuth } from '../lib/auth';
 
 export interface AccuracyStats {
   total: number;
@@ -15,8 +16,10 @@ export interface AccuracyStats {
 }
 
 export function useAccuracyStats() {
+  const { isAuthenticated } = useAuth();
   return useQuery({
     queryKey: ['accuracyStats'],
+    enabled: isAuthenticated,
     queryFn: async (): Promise<AccuracyStats> => {
       const today = new Date().toISOString().slice(0, 10);
 

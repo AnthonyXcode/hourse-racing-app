@@ -22,7 +22,7 @@ async function updateSubscriptionFromStripe(stripeCustomerId: string, data: Reco
     past_due: 'active',
     expired: 'expired',
   };
-  const newUserStatus = statusMap[data.status] ?? 'free';
+  const newUserStatus = statusMap[data.subscriptionStatus] ?? 'free';
 
   if (sub.user?.id) {
     await strapi.db.query('plugin::users-permissions.user').update({
@@ -61,7 +61,7 @@ export default {
               where: { id: sub.id },
               data: {
                 stripeSubscriptionId: subscriptionId,
-                status: 'active',
+                subscriptionStatus: 'active',
               },
             });
           }
@@ -79,7 +79,7 @@ export default {
           : undefined;
 
         await updateSubscriptionFromStripe(customerId, {
-          status: 'active',
+          subscriptionStatus: 'active',
           ...(periodStart ? { currentPeriodStart: periodStart } : {}),
           ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
         });
@@ -88,9 +88,9 @@ export default {
 
       case 'customer.subscription.updated': {
         const customerId = obj.customer as string;
-        const status = obj.cancel_at_period_end ? 'cancelled' : obj.status === 'past_due' ? 'past_due' : 'active';
+        const subStatus = obj.cancel_at_period_end ? 'cancelled' : obj.status === 'past_due' ? 'past_due' : 'active';
         await updateSubscriptionFromStripe(customerId, {
-          status,
+          subscriptionStatus: subStatus,
           stripeSubscriptionId: obj.id,
           currentPeriodStart: new Date(obj.current_period_start * 1000).toISOString(),
           currentPeriodEnd: new Date(obj.current_period_end * 1000).toISOString(),
@@ -100,7 +100,7 @@ export default {
 
       case 'customer.subscription.deleted': {
         const customerId = obj.customer as string;
-        await updateSubscriptionFromStripe(customerId, { status: 'expired' });
+        await updateSubscriptionFromStripe(customerId, { subscriptionStatus: 'expired' });
         break;
       }
 

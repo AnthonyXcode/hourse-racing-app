@@ -1,8 +1,10 @@
 import { YStack, Text, Card, Paragraph, Spinner, XStack, Button, H4 } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlatList } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../lib/auth';
 import { useUpcomingAnalyses } from '../../hooks';
 
@@ -10,7 +12,12 @@ export default function UpcomingScreen() {
   const { t } = useTranslation();
   const { isPaid, isAuthenticated } = useAuth();
   const router = useRouter();
-  const { data, isLoading } = useUpcomingAnalyses(isPaid);
+  const queryClient = useQueryClient();
+  const { data, isLoading, isFetching } = useUpcomingAnalyses(isPaid);
+
+  const onRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['upcomingAnalyses'] });
+  }, [queryClient]);
 
   if (!isAuthenticated) {
     return (
@@ -56,6 +63,21 @@ export default function UpcomingScreen() {
         data={data}
         keyExtractor={(item) => item.meetingKey}
         contentContainerStyle={{ padding: 16, gap: 12 }}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} />}
+        ListHeaderComponent={
+          <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
+            <H4>{t('upcoming.title')}</H4>
+            <Button
+              size="$3"
+              chromeless
+              onPress={onRefresh}
+              disabled={isFetching}
+              opacity={isFetching ? 0.5 : 1}
+            >
+              {isFetching ? <Spinner size="small" /> : <Text fontSize={18}>↻</Text>}
+            </Button>
+          </XStack>
+        }
         ListEmptyComponent={
           <YStack padding="$4" alignItems="center">
             <Paragraph color="$gray11">{t('upcoming.noUpcoming')}</Paragraph>

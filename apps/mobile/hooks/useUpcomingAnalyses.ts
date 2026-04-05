@@ -6,6 +6,7 @@ import {
   meetingKeyFromAnalysis,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
+import { useAuth } from '../lib/auth';
 
 export interface UpcomingItem {
   analysisId: string;
@@ -19,9 +20,10 @@ export interface UpcomingItem {
 }
 
 export function useUpcomingAnalyses(enabled: boolean) {
+  const { isAuthenticated } = useAuth();
   return useQuery({
     queryKey: ['upcomingAnalyses'],
-    enabled,
+    enabled: enabled && isAuthenticated,
     queryFn: async (): Promise<UpcomingItem[]> => {
       const today = new Date().toISOString().slice(0, 10);
       const res = await AnalysisService.getAnalyses({

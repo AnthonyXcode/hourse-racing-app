@@ -1,8 +1,10 @@
-import { YStack, Text, Card, Paragraph, Spinner, XStack } from 'tamagui';
+import { YStack, Text, Card, Paragraph, Spinner, XStack, Button, H4 } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlatList } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePastAnalyses } from '../../hooks';
 
 const RESULT_COLORS: Record<string, string> = {
@@ -15,7 +17,14 @@ const RESULT_COLORS: Record<string, string> = {
 export default function PastScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { data, isLoading } = usePastAnalyses();
+  const queryClient = useQueryClient();
+  const { data, isLoading, isFetching } = usePastAnalyses();
+
+  const onRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['pastAnalyses'] });
+  }, [queryClient]);
+
+  console.log({data});
 
   if (isLoading) {
     return (
@@ -33,6 +42,21 @@ export default function PastScreen() {
         data={data}
         keyExtractor={(item) => item.meetingKey}
         contentContainerStyle={{ padding: 16, gap: 12 }}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} />}
+        ListHeaderComponent={
+          <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
+            <H4>{t('past.title')}</H4>
+            <Button
+              size="$3"
+              chromeless
+              onPress={onRefresh}
+              disabled={isFetching}
+              opacity={isFetching ? 0.5 : 1}
+            >
+              {isFetching ? <Spinner size="small" /> : <Text fontSize={18}>↻</Text>}
+            </Button>
+          </XStack>
+        }
         ListEmptyComponent={
           <YStack padding="$4" alignItems="center">
             <Paragraph color="$gray11">{t('past.noPast')}</Paragraph>

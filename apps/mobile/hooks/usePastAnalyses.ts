@@ -8,6 +8,7 @@ import {
   type AccuracyResult,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
+import { useAuth } from '../lib/auth';
 
 export interface PastItem {
   analysisId: string;
@@ -20,8 +21,10 @@ export interface PastItem {
 }
 
 export function usePastAnalyses() {
+  const { isAuthenticated } = useAuth();
   return useQuery({
     queryKey: ['pastAnalyses'],
+    enabled: isAuthenticated,
     queryFn: async (): Promise<PastItem[]> => {
       const today = new Date().toISOString().slice(0, 10);
 

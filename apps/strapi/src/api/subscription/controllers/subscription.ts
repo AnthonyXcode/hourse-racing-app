@@ -30,7 +30,7 @@ export default {
           data: {
             user: user.id,
             stripeCustomerId: customerId,
-            status: 'expired',
+            subscriptionStatus: 'expired',
             plan: 'monthly',
           },
         });
@@ -57,7 +57,7 @@ export default {
       subscription: sub
         ? {
             plan: sub.plan,
-            status: sub.status,
+            subscriptionStatus: sub.subscriptionStatus,
             currentPeriodEnd: sub.currentPeriodEnd,
           }
         : null,

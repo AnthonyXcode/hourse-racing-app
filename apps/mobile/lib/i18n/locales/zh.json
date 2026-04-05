@@ -35,7 +35,7 @@
   "home": {
     "welcome": "歡迎來到 HK Racing Tips",
     "welcomeBack": "歡迎回來，",
-    "tagline": "基於蒙特卡洛模擬的 AI 賽馬分析。",
+    "tagline": "基於模擬的 AI 賽馬分析。",
     "nextMeeting": "下一場賽事",
     "noFixtures": "沒有即將舉行的賽事",
     "venue": "場地：{{venue}}",
@@ -55,7 +55,7 @@
     "title": "即將到來",
     "signInRequired": "登入以查看分析",
     "premiumFeature": "付費功能",
-    "premiumDesc": "訂閱以解鎖由蒙特卡洛模擬驅動的賽馬分析。",
+    "premiumDesc": "訂閱以解鎖由模擬驅動的賽馬分析。",
     "noUpcoming": "暫無即將到來的分析"
   },
   "accuracy": {
@@ -79,7 +79,7 @@
     "title": "個人資料",
     "notSignedIn": "未登入",
     "upgrade": "升級至高級版",
-    "upgradeDesc": "解鎖由蒙特卡洛模擬驅動的賽馬分析。",
+    "upgradeDesc": "解鎖由模擬驅動的賽馬分析。",
     "subscription": "訂閱",
     "activeDesc": "您擁有有效的高級訂閱。",
     "manage": "管理訂閱"
@@ -98,7 +98,7 @@
     "failedCheckout": "開啟結帳失敗",
     "features": {
       "suggestions": "獨贏、位置及三重彩分析",
-      "analysis": "蒙特卡洛模擬分析",
+      "analysis": "模擬分析",
       "racecard": "完整賽事卡配概率",
       "tracking": "準確度追踪及歷史記錄"
     }

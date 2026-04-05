@@ -6,6 +6,12 @@ const STRAPI_URL = process.env.EXPO_PUBLIC_STRAPI_URL || 'http://localhost:1337/
 const TOKEN_KEY = 'auth_jwt';
 
 let _initialized = false;
+let _onUnauthorized: (() => void) | null = null;
+
+/** Register a callback invoked when any API response is 401. */
+export function onUnauthorized(cb: () => void) {
+  _onUnauthorized = cb;
+}
 
 /**
  * Configure the shared OpenAPI client singleton.
@@ -15,9 +21,16 @@ let _initialized = false;
 export function initApi() {
   if (_initialized) return;
   OpenAPI.BASE = STRAPI_URL;
-  OpenAPI.TOKEN = async () => {
+  (OpenAPI as any).TOKEN = async () => {
     const token = await getAuthToken();
     return token ?? '';
+  };
+  (OpenAPI as any).RESPONSE_INTERCEPTOR = async (response: Response) => {
+    if (response.status === 401) {
+      await removeAuthToken();
+      _onUnauthorized?.();
+    }
+    return response;
   };
   _initialized = true;
 }

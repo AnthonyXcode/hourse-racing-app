@@ -14,7 +14,7 @@
       "name": "Apache 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "x-generation-date": "2026-04-05T14:34:28.241Z"
+    "x-generation-date": "2026-04-05T15:46:27.284Z"
   },
   "x-strapi-config": {
     "plugins": [
@@ -10360,7 +10360,7 @@
                   "monthly"
                 ]
               },
-              "status": {
+              "subscriptionStatus": {
                 "type": "string",
                 "enum": [
                   "active",
@@ -11127,7 +11127,7 @@
               "monthly"
             ]
           },
-          "status": {
+          "subscriptionStatus": {
             "type": "string",
             "enum": [
               "active",
@@ -11243,7 +11243,7 @@
                     "monthly"
                   ]
                 },
-                "status": {
+                "subscriptionStatus": {
                   "type": "string",
                   "enum": [
                     "active",

@@ -27,7 +27,7 @@
       "enum": ["monthly"],
       "default": "monthly"
     },
-    "status": {
+    "subscriptionStatus": {
       "type": "enumeration",
       "enum": ["active", "cancelled", "past_due", "expired"],
       "default": "active"

@@ -2,8 +2,9 @@ import { YStack, XStack, Text, H3, Card, Paragraph, Spinner, Button } from 'tama
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../lib/auth';
 import { useNextFixture, useAccuracyStats } from '../../hooks';
 
@@ -11,16 +12,15 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { data: nextFixture, isLoading, refetch } = useNextFixture();
+  const { data: nextFixture, isLoading, isFetching } = useNextFixture();
   const { data: accuracyStats } = useAccuracyStats();
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+  const onRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['nextFixture'] });
+    queryClient.invalidateQueries({ queryKey: ['accuracyStats'] });
+  }, [queryClient]);
 
   if (!isAuthenticated) {
     return (
@@ -46,12 +46,23 @@ export default function HomeScreen() {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, gap: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} />}
       >
-        <YStack gap="$2">
-          <Paragraph color="$gray11">{t('home.welcomeBack')}</Paragraph>
-          <H3>{user?.username ?? 'User'}</H3>
-        </YStack>
+        <XStack justifyContent="space-between" alignItems="flex-start">
+          <YStack gap="$2">
+            <Paragraph color="$gray11">{t('home.welcomeBack')}</Paragraph>
+            <H3>{user?.username ?? 'User'}</H3>
+          </YStack>
+          <Button
+            size="$3"
+            chromeless
+            onPress={onRefresh}
+            disabled={isFetching}
+            opacity={isFetching ? 0.5 : 1}
+          >
+            {isFetching ? <Spinner size="small" /> : <Text fontSize={18}>↻</Text>}
+          </Button>
+        </XStack>
 
         <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$2">

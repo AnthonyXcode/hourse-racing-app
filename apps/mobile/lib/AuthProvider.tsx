@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UsersPermissionsUsersRolesService } from '@horse-racing/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { AuthContext, type User } from './auth';
-import { strapi, getAuthToken, removeAuthToken, setAuthToken } from './api';
+import { strapi, getAuthToken, removeAuthToken, setAuthToken, onUnauthorized } from './api';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const fetchMe = useCallback(async () => {
     const token = await getAuthToken();
@@ -34,6 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchMe();
   }, [fetchMe]);
 
+  useEffect(() => {
+    onUnauthorized(() => {
+      setUser(null);
+      queryClient.clear();
+    });
+  }, [queryClient]);
+
   const login = useCallback(async (phone: string, otp: string) => {
     const res = await strapi.post<{ jwt: string; user: any }>('/auth-otp/verify', { phone, otp });
     await setAuthToken(res.jwt);
@@ -43,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phone: res.user.phone ?? '',
       subscriptionStatus: res.user.subscriptionStatus ?? 'free',
     });
-  }, []);
+    queryClient.invalidateQueries();
+  }, [queryClient]);
 
   const register = useCallback(async (phone: string, username: string, otp: string) => {
     const res = await strapi.post<{ jwt: string; user: any }>('/auth-otp/register', { phone, username, otp });
@@ -54,12 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phone: res.user.phone ?? '',
       subscriptionStatus: res.user.subscriptionStatus ?? 'free',
     });
-  }, []);
+    queryClient.invalidateQueries();
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     await removeAuthToken();
     setUser(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({

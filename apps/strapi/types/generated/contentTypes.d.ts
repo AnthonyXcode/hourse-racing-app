@@ -760,12 +760,12 @@ export interface ApiSubscriptionSubscription
     plan: Schema.Attribute.Enumeration<['monthly']> &
       Schema.Attribute.DefaultTo<'monthly'>;
     publishedAt: Schema.Attribute.DateTime;
-    status: Schema.Attribute.Enumeration<
+    stripeCustomerId: Schema.Attribute.String;
+    stripeSubscriptionId: Schema.Attribute.String;
+    subscriptionStatus: Schema.Attribute.Enumeration<
       ['active', 'cancelled', 'past_due', 'expired']
     > &
       Schema.Attribute.DefaultTo<'active'>;
-    stripeCustomerId: Schema.Attribute.String;
-    stripeSubscriptionId: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
