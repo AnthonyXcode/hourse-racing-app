@@ -26,7 +26,7 @@
     "noAccount": "還沒有帳戶？",
     "hasAccount": "已有帳戶？",
     "signInWith": "使用手機號碼登入",
-    "joinMessage": "加入以獲取賽馬建議",
+    "joinMessage": "加入以獲取賽馬分析",
     "otpFailed": "發送驗證碼失敗",
     "invalidOtp": "驗證碼無效",
     "regFailed": "註冊失敗",
@@ -35,11 +35,11 @@
   "home": {
     "welcome": "歡迎來到 HK Racing Tips",
     "welcomeBack": "歡迎回來，",
-    "tagline": "基於蒙特卡洛模擬的 AI 賽馬建議。",
+    "tagline": "基於蒙特卡洛模擬的 AI 賽馬分析。",
     "nextMeeting": "下一場賽事",
     "noFixtures": "沒有即將舉行的賽事",
     "venue": "場地：{{venue}}",
-    "accuracy": "建議準確度",
+    "accuracy": "分析準確度",
     "hitRate": "命中率",
     "correct": "正確",
     "total": "總計",
@@ -48,16 +48,21 @@
     "upcoming": "即將到來"
   },
   "past": {
-    "title": "過往建議",
-    "noPast": "暫無過往建議",
-    "picks": "推薦：{{picks}}"
+    "title": "過往分析",
+    "noPast": "暫無過往分析"
   },
   "upcoming": {
     "title": "即將到來",
-    "signInRequired": "登入以查看建議",
+    "signInRequired": "登入以查看分析",
     "premiumFeature": "付費功能",
-    "premiumDesc": "訂閱以解鎖由蒙特卡洛模擬驅動的賽馬建議。",
-    "noUpcoming": "暫無即將到來的建議"
+    "premiumDesc": "訂閱以解鎖由蒙特卡洛模擬驅動的賽馬分析。",
+    "noUpcoming": "暫無即將到來的分析"
+  },
+  "accuracy": {
+    "correct": "正確",
+    "partial": "部份正確",
+    "incorrect": "錯誤",
+    "pending": "待定"
   },
   "race": {
     "notFound": "找不到賽事",
@@ -74,14 +79,14 @@
     "title": "個人資料",
     "notSignedIn": "未登入",
     "upgrade": "升級至高級版",
-    "upgradeDesc": "解鎖由蒙特卡洛模擬分析驅動的賽馬建議。",
+    "upgradeDesc": "解鎖由蒙特卡洛模擬驅動的賽馬分析。",
     "subscription": "訂閱",
     "activeDesc": "您擁有有效的高級訂閱。",
     "manage": "管理訂閱"
   },
   "subscribe": {
     "title": "高級訂閱",
-    "desc": "獲取即將舉行賽事的 AI 賽馬建議。",
+    "desc": "獲取即將舉行賽事的 AI 賽馬分析。",
     "monthly": "月費",
     "subscribeNow": "立即訂閱",
     "openingCheckout": "正在開啟結帳...",
@@ -92,7 +97,7 @@
     "goBack": "返回",
     "failedCheckout": "開啟結帳失敗",
     "features": {
-      "suggestions": "獨贏、位置及三重彩建議",
+      "suggestions": "獨贏、位置及三重彩分析",
       "analysis": "蒙特卡洛模擬分析",
       "racecard": "完整賽事卡配概率",
       "tracking": "準確度追踪及歷史記錄"

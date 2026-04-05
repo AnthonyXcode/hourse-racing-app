@@ -776,47 +776,6 @@ export interface ApiSubscriptionSubscription
   };
 }
 
-export interface ApiSuggestionSuggestion extends Struct.CollectionTypeSchema {
-  collectionName: 'suggestions';
-  info: {
-    description: 'Racing suggestions derived from analysis';
-    displayName: 'Suggestion';
-    pluralName: 'suggestions';
-    singularName: 'suggestion';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    analysis: Schema.Attribute.Relation<'manyToOne', 'api::analysis.analysis'>;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::suggestion.suggestion'
-    > &
-      Schema.Attribute.Private;
-    meeting: Schema.Attribute.Relation<'manyToOne', 'api::meeting.meeting'>;
-    name: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.Unique;
-    picks: Schema.Attribute.JSON;
-    publishedAt: Schema.Attribute.DateTime;
-    raceDate: Schema.Attribute.Date & Schema.Attribute.Required;
-    result: Schema.Attribute.Enumeration<
-      ['pending', 'correct', 'partial', 'incorrect']
-    > &
-      Schema.Attribute.DefaultTo<'pending'>;
-    type: Schema.Attribute.Enumeration<['win', 'place', 'trio']> &
-      Schema.Attribute.Required;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
 export interface ApiTrainerTrainer extends Struct.CollectionTypeSchema {
   collectionName: 'trainers';
   info: {
@@ -1404,7 +1363,6 @@ declare module '@strapi/strapi' {
       'api::jockey.jockey': ApiJockeyJockey;
       'api::meeting.meeting': ApiMeetingMeeting;
       'api::subscription.subscription': ApiSubscriptionSubscription;
-      'api::suggestion.suggestion': ApiSuggestionSuggestion;
       'api::trainer.trainer': ApiTrainerTrainer;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

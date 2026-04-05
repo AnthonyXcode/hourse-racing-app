@@ -7,6 +7,12 @@ import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth';
 import { strapi } from '../../lib/api';
+import {
+  latestAnalysisPerRace,
+  deriveSuggestions,
+  checkAccuracy,
+  meetingKeyFromAnalysis,
+} from '../../lib/analysis-helpers';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -30,14 +36,59 @@ export default function HomeScreen() {
   const { data: accuracyStats } = useQuery({
     queryKey: ['accuracyStats'],
     queryFn: async () => {
-      const res = await strapi.find<{ data: any[] }>('suggestions', {
-        filters: { result: { $ne: 'pending' } },
+      const today = new Date().toISOString().slice(0, 10);
+      const analysesRes = await strapi.find<{ data: any[] }>('analyses', {
+        filters: { analyzedAt: { $lt: today } },
+        populate: { results: true, meeting: true },
         pagination: { pageSize: 200 },
+        sort: ['analyzedAt:desc'],
       });
-      const items = res.data ?? [];
-      const total = items.length;
-      const correct = items.filter((s: any) => s.result === 'correct').length;
-      const partial = items.filter((s: any) => s.result === 'partial').length;
+      const latest = latestAnalysisPerRace(analysesRes.data ?? []);
+
+      const dateVenueSet = new Set<string>();
+      for (const a of latest) {
+        const key = meetingKeyFromAnalysis(a);
+        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)/);
+        if (match) dateVenueSet.add(`${match[1]}_${match[2]}`);
+      }
+
+      const historyMap = new Map<string, any>();
+      for (const dv of dateVenueSet) {
+        const histRes = await strapi.find<{ data: any[] }>('histories', {
+          filters: { name: { $eq: dv } },
+          pagination: { pageSize: 1 },
+        });
+        if (histRes.data?.[0]) historyMap.set(dv, histRes.data[0]);
+      }
+
+      let total = 0;
+      let correct = 0;
+      let partial = 0;
+      for (const a of latest) {
+        const results = a.results ?? [];
+        if (results.length === 0) continue;
+        const key = meetingKeyFromAnalysis(a);
+        const match = key.match(/^(\d{4}-\d{2}-\d{2})_([A-Z]+)_R(\d+)$/);
+        if (!match) continue;
+        const dv = `${match[1]}_${match[2]}`;
+        const raceNo = parseInt(match[3], 10);
+        const history = historyMap.get(dv);
+        if (!history) continue;
+        const races: any[] = history.races ?? [];
+        const raceResult = races.find((r: any) => r.raceNumber === raceNo);
+        if (!raceResult) continue;
+        const placings = raceResult.finishPlacings ?? [];
+        if (placings.length === 0) continue;
+
+        const suggestions = deriveSuggestions(results);
+        for (const s of suggestions) {
+          const acc = checkAccuracy(s.type, s.picks, placings);
+          if (acc === 'pending') continue;
+          total++;
+          if (acc === 'correct') correct++;
+          else if (acc === 'partial') partial++;
+        }
+      }
       return { total, correct, partial, rate: total > 0 ? ((correct + partial * 0.5) / total) * 100 : 0 };
     },
   });

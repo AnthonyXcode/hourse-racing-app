@@ -26,7 +26,7 @@
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
     "signInWith": "Sign in with your phone number",
-    "joinMessage": "Join to get racing suggestions",
+    "joinMessage": "Join to get racing analysis",
     "otpFailed": "Failed to send OTP",
     "invalidOtp": "Invalid OTP",
     "regFailed": "Registration failed",
@@ -35,11 +35,11 @@
   "home": {
     "welcome": "Welcome to HK Racing Tips",
     "welcomeBack": "Welcome back,",
-    "tagline": "Get AI-powered racing suggestions based on Monte Carlo simulations.",
+    "tagline": "Get AI-powered racing analysis based on Monte Carlo simulations.",
     "nextMeeting": "Next Meeting",
     "noFixtures": "No upcoming fixtures",
     "venue": "Venue: {{venue}}",
-    "accuracy": "Suggestion Accuracy",
+    "accuracy": "Analysis Accuracy",
     "hitRate": "Hit Rate",
     "correct": "Correct",
     "total": "Total",
@@ -48,16 +48,21 @@
     "upcoming": "Upcoming"
   },
   "past": {
-    "title": "Past Suggestions",
-    "noPast": "No past suggestions yet",
-    "picks": "Picks: {{picks}}"
+    "title": "Past Analysis",
+    "noPast": "No past analysis yet"
   },
   "upcoming": {
     "title": "Upcoming",
-    "signInRequired": "Sign in to view suggestions",
+    "signInRequired": "Sign in to view analysis",
     "premiumFeature": "Premium Feature",
-    "premiumDesc": "Subscribe to unlock upcoming race suggestions powered by Monte Carlo simulation.",
-    "noUpcoming": "No upcoming suggestions available"
+    "premiumDesc": "Subscribe to unlock upcoming race analysis powered by Monte Carlo simulation.",
+    "noUpcoming": "No upcoming analysis available"
+  },
+  "accuracy": {
+    "correct": "Correct",
+    "partial": "Partial",
+    "incorrect": "Incorrect",
+    "pending": "Pending"
   },
   "race": {
     "notFound": "Race not found",
@@ -74,14 +79,14 @@
     "title": "Profile",
     "notSignedIn": "Not signed in",
     "upgrade": "Upgrade to Premium",
-    "upgradeDesc": "Unlock upcoming race suggestions, powered by Monte Carlo simulation analysis.",
+    "upgradeDesc": "Unlock upcoming race analysis, powered by Monte Carlo simulation.",
     "subscription": "Subscription",
     "activeDesc": "You have an active premium subscription.",
     "manage": "Manage Subscription"
   },
   "subscribe": {
     "title": "Premium Subscription",
-    "desc": "Get AI-powered racing suggestions for upcoming meetings.",
+    "desc": "Get AI-powered racing analysis for upcoming meetings.",
     "monthly": "Monthly",
     "subscribeNow": "Subscribe Now",
     "openingCheckout": "Opening checkout...",
@@ -92,7 +97,7 @@
     "goBack": "Go Back",
     "failedCheckout": "Failed to start checkout",
     "features": {
-      "suggestions": "Win, Place & Trio suggestions",
+      "suggestions": "Win, Place & Trio analysis",
       "analysis": "Monte Carlo simulation analysis",
       "racecard": "Full racecard with probabilities",
       "tracking": "Accuracy tracking & history"

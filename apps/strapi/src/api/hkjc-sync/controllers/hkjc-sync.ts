@@ -12,7 +12,6 @@ import {
 } from '../../../services/hkjc-sync-runner';
 import { getAppStrapi } from '../../../services/strapi-instance';
 import type { MeetingsJobOptions } from '../../../services/hkjc-daily-job';
-import { generateSuggestionsForMeetingKey } from '../../../services/suggestion-generator';
 
 function readTriggerSecret(ctx: any): string | undefined {
   return (
@@ -146,31 +145,6 @@ export default {
 
   async triggerHistory(ctx: any) {
     await runTrigger(ctx, isHkjcHistoryJobRunning, runHkjcHistoryJobOnce);
-  },
-
-  async triggerSuggestions(ctx: any) {
-    if (!rejectUnlessSecretOk(ctx)) return;
-    const q = ctx.query ?? {};
-    let meetingKey: string | undefined;
-    if (
-      typeof q.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.date) &&
-      typeof q.venue === 'string' && (q.venue === 'ST' || q.venue === 'HV') &&
-      typeof q.raceNo === 'string' && /^\d{1,2}$/.test(q.raceNo)
-    ) {
-      meetingKey = `${q.date}_${q.venue}_R${q.raceNo}`;
-    }
-    if (!meetingKey) {
-      ctx.status = 400;
-      ctx.body = { error: 'date, venue, and raceNo query params required' };
-      return;
-    }
-    try {
-      const count = await generateSuggestionsForMeetingKey(meetingKey);
-      ctx.body = { ok: true, suggestions: count };
-    } catch (e) {
-      ctx.status = 500;
-      ctx.body = { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
   },
 
   async triggerAnalysis(ctx: any) {
