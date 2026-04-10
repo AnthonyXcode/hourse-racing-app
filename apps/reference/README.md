@@ -343,12 +343,20 @@ Chromium needs system libraries. If logs show `libgbm.so.1: cannot open shared o
 pnpm --filter @horse-racing/strapi exec playwright install-deps chromium
 ```
 
-If `apt` is broken (e.g. EOL Ubuntu), fix sources first, or install packages manually:
+If `apt-get update` fails with **`kinetic-security Release` / 404** (or similar) on an EOL Ubuntu, `security.ubuntu.com` no longer hosts that release. Repoint it to **old-releases**, then update again:
 
 ```bash
+for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+  [ -f "$f" ] || continue
+  sudo sed -i.bak 's|http://security.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' "$f"
+  sudo sed -i.bak 's|https://security.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' "$f"
+done
 sudo apt-get update
-sudo apt-get install -y libgbm1
 ```
+
+The `playwright:install-linux-deps` script prints this block if `apt-get update` fails, then still tries `apt-get install` in case other mirrors already refreshed.
+
+For a minimal manual install: `sudo apt-get install -y libgbm1` (after `apt-get update` succeeds).
 
 For a fuller set matching Playwright’s usual needs, from `apps/strapi` run `pnpm run playwright:install-linux-deps` (runs `scripts/install-playwright-linux-deps-apt.sh`).
 

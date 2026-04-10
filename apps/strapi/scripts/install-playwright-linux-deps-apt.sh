@@ -7,16 +7,35 @@
 # Or from apps/strapi:
 #   pnpm run playwright:install-linux-deps
 #
-# If apt update fails (e.g. EOL release), fix /etc/apt/sources.list first, then rerun.
+# EOL Ubuntu: if security.ubuntu.com returns 404, repoint that pocket to old-releases (see message below).
 
-set -euo pipefail
+set -uo pipefail
 
 if ! command -v apt-get >/dev/null 2>&1; then
   echo "This script is for Debian/Ubuntu (apt-get). On other distros use: pnpm exec playwright install-deps chromium" >&2
   exit 1
 fi
 
-sudo apt-get update
+if ! sudo apt-get update; then
+  cat >&2 <<'APT_FIX'
+
+apt-get update failed (often because security.ubuntu.com no longer serves an EOL release).
+
+Fix sources, then rerun this script. Point the security pocket at old-releases:
+
+  sudo cp -a /etc/apt/sources.list /etc/apt/sources.list.bak.$(date +%Y%m%d)
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+    [ -f "$f" ] || continue
+    sudo sed -i.bak 's|http://security.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' "$f"
+    sudo sed -i.bak 's|https://security.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' "$f"
+  done
+  sudo apt-get update
+
+Continuing with package install in case indexes from other mirrors are already usable…
+APT_FIX
+fi
+
+set -e
 sudo apt-get install -y \
   libgbm1 \
   libnss3 \
