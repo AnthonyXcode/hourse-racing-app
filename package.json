@@ -25,7 +25,8 @@
         "pm2:dev:start": "pm2 start ecosystem.dev.config.cjs",
         "pm2:prod:start": "pm2 start ecosystem.prod.config.cjs",
         "pm2:dev:reload": "pm2 reload ecosystem.dev.config.cjs --update-env",
-        "pm2:prod:reload": "pm2 reload ecosystem.prod.config.cjs --update-env"
+        "pm2:prod:reload": "pm2 reload ecosystem.prod.config.cjs --update-env",
+        "transfer:db": "bash scripts/transfer-db-to-server.sh"
     },
     "devDependencies": {
         "turbo": "^2.4.4"

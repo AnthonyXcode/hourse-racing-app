@@ -74,6 +74,25 @@ Optional Strapi overrides in `.env`:
 
 Strapi loads `apps/strapi/.env` when PM2 sets `cwd` to that directory. Expo loads `apps/frontend/.env` from the frontend app root.
 
+### Transfer database (local → Ubuntu, SQLite)
+
+When Strapi uses **SQLite** (`DATABASE_CLIENT=sqlite`, default file `apps/strapi/.tmp/data.db`), copy your local DB to the server with SSH:
+
+```bash
+# Stop Strapi on the server first, then from your laptop (repo root):
+TRANSFER_SSH=deploy@your.server \
+TRANSFER_REMOTE_STRAPI_ROOT=/home/deploy/hourse-racing-app/apps/strapi \
+pnpm transfer:db
+```
+
+- **`TRANSFER_REMOTE_STRAPI_ROOT`** must be the absolute path to **`apps/strapi`** on the server (the directory that contains `.tmp/`).
+- Optional: **`TRANSFER_LOCAL_DB`** if your SQLite file is not `apps/strapi/.tmp/data.db`.
+- Optional: **`TRANSFER_YES=1`** to skip the confirmation prompt (scripts/CI only).
+- Optional: **`TRANSFER_USE_SCP=1`** if `rsync` is not installed locally.
+- Requires **`rsync`** or **`scp`** and **`ssh`** (Git Bash / macOS / Linux).
+
+**PostgreSQL (or MySQL):** this script is for SQLite only. Use `pg_dump` / `pg_restore` (or your SQL client’s dump) against the same `DATABASE_*` / `DATABASE_URL` values as production, then restore on the server before starting Strapi.
+
 #### Same server: ports per process
 
 Each PM2 process listens on its own port. Strapi uses `PORT` in the ecosystem `env` block (wins over `.env`). Frontend web ports are set in `apps/frontend/package.json` (`dev:web` and `start:web`).
