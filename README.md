@@ -65,6 +65,8 @@ pnpm install --frozen-lockfile
 
 **Frontend:** create `apps/frontend/.env` for public client variables (see `apps/frontend/.env.example`), especially `EXPO_PUBLIC_STRAPI_URL` pointing at your HTTPS API (e.g. `https://api.example.com/api`).
 
+**Gitignored variants (optional):** `apps/strapi/.env.dev`, `apps/strapi/.env.prod`, `apps/frontend/.env.dev`, and `apps/frontend/.env.prod` are listed in `.gitignore` so you can keep separate dev/prod templates on disk. Strapi and Expo still read **`apps/strapi/.env`** and **`apps/frontend/.env`** by default — copy the variant you need (e.g. `cp apps/strapi/.env.dev apps/strapi/.env`) before running locally or deploying.
+
 Optional Strapi overrides in `.env`:
 
 | Variable | Purpose |
@@ -122,6 +124,8 @@ pm2 logs
 Useful commands:
 
 ```bash
+pnpm pm2:list          # pm2 list — status of all processes
+pnpm pm2:stop          # stop all four horse-racing-* apps (dev + prod)
 pm2 restart horse-racing-strapi-dev
 pm2 restart horse-racing-frontend-dev
 pm2 stop horse-racing-strapi-dev horse-racing-frontend-dev

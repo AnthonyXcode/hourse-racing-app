@@ -26,6 +26,8 @@
         "pm2:prod:start": "pm2 start ecosystem.prod.config.cjs",
         "pm2:dev:reload": "pm2 reload ecosystem.dev.config.cjs --update-env",
         "pm2:prod:reload": "pm2 reload ecosystem.prod.config.cjs --update-env",
+        "pm2:list": "pm2 list",
+        "pm2:stop": "pm2 stop horse-racing-strapi horse-racing-strapi-dev horse-racing-frontend horse-racing-frontend-dev",
         "transfer:db": "bash scripts/transfer-db-to-server.sh"
     },
     "devDependencies": {

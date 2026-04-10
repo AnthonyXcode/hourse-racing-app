@@ -11,6 +11,10 @@ node_modules
 .env
 .env.local
 .env.*.local
+apps/frontend/.env.dev
+apps/frontend/.env.prod
+apps/strapi/.env.dev
+apps/strapi/.env.prod
 
 # OS
 .DS_Store
