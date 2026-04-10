@@ -11,6 +11,7 @@
     "develop": "strapi develop",
     "postinstall": "node scripts/install-playwright-chromium.cjs",
     "playwright:install": "node scripts/install-playwright-chromium.cjs --strict",
+    "playwright:install-linux-deps": "bash scripts/install-playwright-linux-deps-apt.sh",
     "start": "strapi start",
     "strapi": "strapi",
     "upgrade": "npx @strapi/upgrade latest",

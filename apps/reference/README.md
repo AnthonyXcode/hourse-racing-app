@@ -334,6 +334,24 @@ export PLAYWRIGHT_BROWSERS_PATH=/Users/you/Library/Caches/ms-playwright
 npx playwright install chromium
 ```
 
+### Playwright on Ubuntu / Linux (`libgbm.so.1` missing)
+
+Chromium needs system libraries. If logs show `libgbm.so.1: cannot open shared object file`, install OS deps on the server (Debian/Ubuntu):
+
+```bash
+# From repo root, or cd apps/strapi first
+pnpm --filter @horse-racing/strapi exec playwright install-deps chromium
+```
+
+If `apt` is broken (e.g. EOL Ubuntu), fix sources first, or install packages manually:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libgbm1
+```
+
+For a fuller set matching Playwright’s usual needs, from `apps/strapi` run `pnpm run playwright:install-linux-deps` (runs `scripts/install-playwright-linux-deps-apt.sh`).
+
 ### Odds Fetch Timeout
 - Check internet connection
 - Verify date is a race day

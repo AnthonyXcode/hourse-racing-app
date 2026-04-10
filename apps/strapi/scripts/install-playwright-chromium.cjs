@@ -12,7 +12,8 @@ if (!process.env.PLAYWRIGHT_BROWSERS_PATH?.trim()) {
 }
 
 const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const r = spawnSync(cmd, ['playwright', 'install', 'chromium'], {
+// Playwright 1.49+ headless uses chromium-headless-shell; install both on servers (e.g. Ubuntu + PM2).
+const r = spawnSync(cmd, ['playwright', 'install', 'chromium', 'chromium-headless-shell'], {
   cwd: root,
   stdio: 'inherit',
   env: process.env,
