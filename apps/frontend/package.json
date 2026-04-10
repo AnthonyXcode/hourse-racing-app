@@ -1,13 +1,17 @@
 {
-  "name": "mobile",
+  "name": "@horse-racing/frontend",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
     "dev": "CI=false expo start",
+    "dev:web": "CI=false expo start --web --port 3000",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build": "expo export --platform web",
+    "start:web": "serve dist -s -l tcp://0.0.0.0:3001",
+    "eas-build-post-install": "cd ../.. && pnpm exec turbo run build --filter=@horse-racing/api-client"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.9",
@@ -39,6 +43,7 @@
     "react-native-screens": "^4.24.0",
     "react-native-svg": "^15.15.4",
     "react-native-web": "^0.21.2",
+    "serve": "^14.2.4",
     "tamagui": "2.0.0-rc.36"
   },
   "devDependencies": {

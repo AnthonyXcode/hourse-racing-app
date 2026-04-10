@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 14.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+      "env": {
+        "EXPO_PUBLIC_STRAPI_URL": "https://staging.example.com/api",
+        "EXPO_PUBLIC_RECAPTCHA_SITE_KEY": "",
+        "EXPO_PUBLIC_RECAPTCHA_BASE_URL": "https://www.google.com"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+      "env": {
+        "EXPO_PUBLIC_STRAPI_URL": "https://api.example.com/api",
+        "EXPO_PUBLIC_RECAPTCHA_SITE_KEY": "",
+        "EXPO_PUBLIC_RECAPTCHA_BASE_URL": "https://www.google.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

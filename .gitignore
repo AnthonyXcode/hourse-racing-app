@@ -19,10 +19,11 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+logs/pm2
 
-# Expo
-apps/mobile/.expo
-apps/mobile/dist
+# Expo / frontend web export
+apps/frontend/.expo
+apps/frontend/dist
 
 # Strapi
 apps/strapi/.tmp

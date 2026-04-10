@@ -18,10 +18,14 @@
         "dev:strapi": "npm run dev -w @horse-racing/strapi",
         "build:strapi": "npm run build -w @horse-racing/strapi",
         "start:strapi": "npm run start -w @horse-racing/strapi",
-        "mobile": "npm run -w @horse-racing/mobile",
-        "dev:mobile": "npm run dev -w @horse-racing/mobile",
-        "build:mobile": "npm run build -w @horse-racing/mobile",
-        "start:mobile": "npm run start -w @horse-racing/mobile"
+        "frontend": "npm run -w @horse-racing/frontend",
+        "dev:frontend": "npm run dev -w @horse-racing/frontend",
+        "build:frontend": "npm run build -w @horse-racing/frontend",
+        "start:frontend": "npm run start -w @horse-racing/frontend",
+        "pm2:dev:start": "pm2 start ecosystem.dev.config.cjs",
+        "pm2:prod:start": "pm2 start ecosystem.prod.config.cjs",
+        "pm2:dev:reload": "pm2 reload ecosystem.dev.config.cjs --update-env",
+        "pm2:prod:reload": "pm2 reload ecosystem.prod.config.cjs --update-env"
     },
     "devDependencies": {
         "turbo": "^2.4.4"
