@@ -28,14 +28,6 @@
         "cache": false,
         "persistent": true
       },
-      "dev:synpulse": {
-        "cache": false,
-        "persistent": true
-      },
-      "dev:synpulse8": {
-        "cache": false,
-        "persistent": true
-      },
       "start": {
         "dependsOn": [
           "build"

@@ -13,8 +13,7 @@ const nextjsConfig = defineConfig([
   // Override default ignores of eslint-config-next
   globalIgnores([
     ".next/**",
-    ".next-synpulse/**",
-    ".next-synpulse8/**",
+    ".next-horse-racing/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

@@ -7,13 +7,13 @@ Auto-generated API client for Synpulse Strapi CMS using OpenAPI specification.
 ## Installation
 
 ```bash
-npm install @synpulse/api-client
+npm install @@horse-racing/api-client
 ```
 
 ## Usage
 
 ```typescript
-import { createApiClient } from '@synpulse/api-client';
+import { createApiClient } from '@@horse-racing/api-client';
 
 const client = createApiClient({
   baseURL: 'http://localhost:1337/api',

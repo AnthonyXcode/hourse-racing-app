@@ -142,7 +142,7 @@ function main() {
     console.log('\n✅ All patches applied successfully!\n');
     console.log('You can now use these options in your code:');
     console.log('');
-    console.log('  import { OpenAPI } from "@synpulse/api-client";');
+    console.log('  import { OpenAPI } from "@horse-racing/api-client";');
     console.log('');
     console.log('  // Set global cache options');
     console.log('  OpenAPI.CACHE = "force-cache";');
