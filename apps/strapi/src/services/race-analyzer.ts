@@ -337,10 +337,17 @@ function analyzeHorse(horse: Horse, race: Race, entry: RaceEntry): HorseAnalysis
 
 function computeOverallRating(a: HorseAnalysis): number {
   const w = {
-    speedRating: 0.35, formScore: 0.13, classIndicator: 0.06,
-    ratingMomentum: 0.06, fitness: 0.10, drawAdvantage: 0.08,
-    jockeyEdge: 0.08, trainerForm: 0.05, surfacePreference: 0.03,
-    goingPreference: 0.03, distancePreference: 0.03,
+    speedRating: 0.35, 
+    formScore: 0.13, 
+    classIndicator: 0.06,
+    ratingMomentum: 0.06, 
+    fitness: 0.10, 
+    drawAdvantage: 0.08,
+    jockeyEdge: 0.08, 
+    trainerForm: 0.05, 
+    surfacePreference: 0.03,
+    goingPreference: 0.03, 
+    distancePreference: 0.03,
   };
   const normalizedSpeed = (a.averageSpeedRating - 60) / 60;
   const fitnessScore = computeFitnessScore(a.daysSinceLastRace);
@@ -579,6 +586,7 @@ function parsePastPerformances(json: string | null | undefined): PastPerformance
   try { arr = JSON.parse(json); } catch { return []; }
   if (!Array.isArray(arr)) return [];
   return arr.map((p: any) => ({
+    // TODO: the date is one day before the actual date, need to fix this
     date: typeof p.date === 'string' ? dateParse(p.date.slice(0, 10), 'yyyy-MM-dd', new Date()) : new Date(p.date),
     venue: VENUE_MAP[p.venue] ?? 'Sha Tin',
     raceNumber: Number(p.raceNumber) || 1,

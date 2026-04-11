@@ -3,6 +3,8 @@
  * Strapi Document Service payloads for History.results (history.race-result components).
  */
 
+import { format } from 'date-fns';
+
 type VenueCode = 'ST' | 'HV';
 
 function venueToCode(v: unknown): VenueCode | null {
@@ -12,6 +14,7 @@ function venueToCode(v: unknown): VenueCode | null {
   return null;
 }
 
+/** Calendar Y-M-D aligned with scraper `raceId` (local `format`), not UTC `toISOString` date. */
 function toDateOnly(value: unknown): string | null {
   if (value == null) return null;
   if (typeof value === 'string') {
@@ -19,7 +22,7 @@ function toDateOnly(value: unknown): string | null {
     return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    return format(value, 'yyyy-MM-dd');
   }
   return null;
 }
