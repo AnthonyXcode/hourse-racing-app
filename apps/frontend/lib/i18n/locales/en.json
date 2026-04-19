@@ -51,7 +51,20 @@
   },
   "past": {
     "title": "Past Analysis",
-    "noPast": "No past analysis yet"
+    "noPast": "No past analysis yet",
+    "legendTitle": "How results are scored",
+    "legendCorrect": "Correct: The pick fully matched the actual result.",
+    "legendPartial": "Partial: Some of the picks matched.",
+    "legendIncorrect": "Incorrect: None of the picks matched.",
+    "legendPlaceDesc": "Place: #1 ranked horse finishes top 3.",
+    "legendWinDesc": "Win: Any of top-3 ranked horses wins. Partial if top 3.",
+    "legendTrioDesc": "Trio: Banker + legs cover all 3 placed horses.",
+    "summary": "Summary",
+    "banker": "Banker",
+    "leg": "Leg",
+    "hit": "Hit",
+    "miss": "Miss",
+    "actualResult": "Actual top 3"
   },
   "upcoming": {
     "title": "Upcoming",

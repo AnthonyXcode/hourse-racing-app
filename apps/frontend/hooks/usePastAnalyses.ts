@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import type { History, HistoryRaceResultComponent } from '@horse-racing/api-client';
+import type {
+  History,
+  HistoryRaceResultComponent,
+  HistoryFinishPlacingComponent,
+} from '@horse-racing/api-client';
 import { AnalysisService, HistoryService } from '@horse-racing/api-client';
 import {
   latestAnalysisPerRace,
@@ -11,7 +15,11 @@ import {
   type AccuracyResult,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
-import { useAuth } from '../lib/auth';
+export interface PastPlacing {
+  horseNumber: number;
+  horseName: string;
+  finishPosition: number;
+}
 
 export interface PastItem {
   analysisId: string;
@@ -21,13 +29,12 @@ export interface PastItem {
   raceNo: number;
   analyzedAt: string;
   suggestions: (DerivedSuggestion & { result: AccuracyResult })[];
+  placings: PastPlacing[];
 }
 
 export function usePastAnalyses() {
-  const { isAuthenticated } = useAuth();
   return useQuery({
     queryKey: ['pastAnalyses'],
-    enabled: isAuthenticated,
     queryFn: async (): Promise<PastItem[]> => {
       const today = new Date().toISOString().slice(0, 10);
 
@@ -40,7 +47,10 @@ export function usePastAnalyses() {
         HistoryService.getHistories({
           sort: 'name:desc',
           paginationPageSize: 15,
-          populate: '*',
+          populate: {
+            0: 'results',
+            1: 'results.finishOrder',
+          },
         }),
       ]);
 
@@ -77,6 +87,18 @@ export function usePastAnalyses() {
           }),
         );
 
+        const placings: PastPlacing[] = finishOrder
+          .filter(
+            (f): f is HistoryFinishPlacingComponent & { finishPosition: number; horseNumber: number } =>
+              f.finishPosition != null && f.finishPosition <= 3 && f.horseNumber != null,
+          )
+          .map((f) => ({
+            horseNumber: f.horseNumber,
+            horseName: f.horseName ?? '',
+            finishPosition: f.finishPosition,
+          }))
+          .sort((a, b) => a.finishPosition - b.finishPosition);
+
         items.push({
           analysisId: a.id?.toString() ?? a.documentId ?? '',
           meetingKey: key,
@@ -85,6 +107,7 @@ export function usePastAnalyses() {
           raceNo,
           analyzedAt: a.analyzedAt,
           suggestions,
+          placings,
         });
       }
 

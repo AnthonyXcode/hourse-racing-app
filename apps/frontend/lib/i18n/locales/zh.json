@@ -51,7 +51,20 @@
   },
   "past": {
     "title": "過往分析",
-    "noPast": "暫無過往分析"
+    "noPast": "暫無過往分析",
+    "legendTitle": "結果評分方式",
+    "legendCorrect": "正確：所選馬匹完全命中實際結果。",
+    "legendPartial": "部分正確：部分所選馬匹命中。",
+    "legendIncorrect": "錯誤：所選馬匹全部未命中。",
+    "legendPlaceDesc": "位置：排名第1的馬匹跑入前3名。",
+    "legendWinDesc": "獨贏：排名前3的馬匹中任一匹勝出即正確，跑入前3為部分正確。",
+    "legendTrioDesc": "單T：膽 + 腳涵蓋全部3匹入圍馬匹。",
+    "summary": "摘要",
+    "banker": "膽",
+    "leg": "腳",
+    "hit": "命中",
+    "miss": "未中",
+    "actualResult": "實際前3名"
   },
   "upcoming": {
     "title": "即將到來",
