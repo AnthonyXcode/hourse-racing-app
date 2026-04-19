@@ -7,6 +7,7 @@ import {
   checkAccuracy,
   meetingKeyFromAnalysis,
   toHorseResults,
+  enrichWithOdds,
 } from '../lib/analysis-helpers';
 export interface TypeAccuracy {
   total: number;
@@ -41,7 +42,10 @@ export function useAccuracyStats() {
         HistoryService.getHistories({
           sort: 'name:desc',
           paginationPageSize: 15,
-          populate: '*',
+          populate: {
+            0: 'results',
+            1: 'results.finishOrder',
+          },
         }),
       ]);
 
@@ -77,7 +81,8 @@ export function useAccuracyStats() {
         const finishOrder = raceResult.finishOrder ?? [];
         if (finishOrder.length === 0) continue;
 
-        const suggestions = deriveSuggestions(toHorseResults(results));
+        const horseResults = enrichWithOdds(toHorseResults(results), finishOrder);
+        const suggestions = deriveSuggestions(horseResults);
         for (const s of suggestions) {
           const acc = checkAccuracy(s.type, s.picks, finishOrder);
           if (acc === 'pending') continue;

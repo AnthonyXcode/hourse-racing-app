@@ -99,7 +99,7 @@
     "goBack": "返回",
     "failedCheckout": "開啟結帳失敗",
     "features": {
-      "suggestions": "獨贏、位置及三重彩分析",
+      "suggestions": "獨贏、位置及單T分析",
       "analysis": "模擬分析",
       "racecard": "完整賽事卡配概率",
       "tracking": "準確度追踪及歷史記錄"
@@ -108,7 +108,7 @@
   "suggestion": {
     "win": "獨贏",
     "place": "位置",
-    "trio": "三重彩"
+    "trio": "單T"
   },
   "tabs": {
     "home": "首頁",

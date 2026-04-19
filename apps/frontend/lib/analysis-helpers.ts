@@ -12,6 +12,7 @@ export interface HorseResult {
   placeProbability: number;
   ranking: number;
   formRecordCount?: number;
+  winOdds?: number;
 }
 
 export function toHorseResults(
@@ -30,6 +31,26 @@ export function toHorseResults(
       ranking: c.ranking!,
       formRecordCount: c.formRecordCount,
     }));
+}
+
+/**
+ * Enrich horse results with actual market win odds from race finish data.
+ * For upcoming races without finish data, winOdds stays undefined.
+ */
+export function enrichWithOdds(
+  results: HorseResult[],
+  finishOrder: HistoryFinishPlacingComponent[],
+): HorseResult[] {
+  const oddsMap = new Map<number, number>();
+  for (const f of finishOrder) {
+    if (f.horseNumber != null && f.winOdds != null) {
+      oddsMap.set(f.horseNumber, f.winOdds);
+    }
+  }
+  return results.map((r) => ({
+    ...r,
+    winOdds: oddsMap.get(r.horseNumber),
+  }));
 }
 
 export interface DerivedPick {
@@ -59,11 +80,11 @@ export function deriveWinPicks(results: HorseResult[]): DerivedPick[] {
 }
 
 const TRIO_WIN_PROB_THRESHOLD = 0.25;
-const TRIO_IMPLIED_ODDS_THRESHOLD = 10;
+const TRIO_WIN_ODDS_THRESHOLD = 10;
 
 /**
  * Trio bet: ranking #1 as banker, legs are other horses with
- * winProbability > 25% or implied odds < 10 (winProbability > 10%).
+ * winProbability > 25% or actual market winOdds < 10.
  */
 export function deriveTrioPicks(results: HorseResult[]): {
   banker: DerivedPick | null;
@@ -83,7 +104,7 @@ export function deriveTrioPicks(results: HorseResult[]): {
       (r) =>
         r.horseNumber !== banker.horseNumber &&
         (r.winProbability > TRIO_WIN_PROB_THRESHOLD ||
-          (r.winProbability > 0 && 1 / r.winProbability < TRIO_IMPLIED_ODDS_THRESHOLD))
+          (r.winOdds != null && r.winOdds < TRIO_WIN_ODDS_THRESHOLD))
     )
     .sort((a, b) => a.ranking - b.ranking)
     .map(({ horseNumber, horseName }) => ({ horseNumber, horseName }));

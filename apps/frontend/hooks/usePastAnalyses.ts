@@ -7,6 +7,7 @@ import {
   checkAccuracy,
   meetingKeyFromAnalysis,
   toHorseResults,
+  enrichWithOdds,
   type AccuracyResult,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
@@ -68,7 +69,8 @@ export function usePastAnalyses() {
         const raceResult = races.find((r) => r.raceNumber === raceNo);
         const finishOrder = raceResult?.finishOrder ?? [];
 
-        const suggestions = deriveSuggestions(toHorseResults(results)).map(
+        const horseResults = enrichWithOdds(toHorseResults(results), finishOrder);
+        const suggestions = deriveSuggestions(horseResults).map(
           (s) => ({
             ...s,
             result: checkAccuracy(s.type, s.picks, finishOrder),
