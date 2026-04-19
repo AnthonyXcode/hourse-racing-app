@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { YStack, XStack, Text, Card, Paragraph, Spinner, H4 } from 'tamagui';
+import { YStack, XStack, Text, Card, Paragraph, Spinner, H4, H3 } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
@@ -77,7 +77,7 @@ export default function RaceDetailScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$1">
-            <H4>{meeting.raceName || `Race ${meeting.raceNumber}`}</H4>
+            <H3>{`Race ${meeting.raceNumber}`}</H3>
             <XStack gap="$3" flexWrap="wrap">
               <Text color="$gray11">{meeting.raceDate}</Text>
               {meeting.distance ? <Text color="$gray11">{meeting.distance}m</Text> : null}
@@ -88,7 +88,11 @@ export default function RaceDetailScreen() {
         </Card>
 
         {(meeting.runners ?? [])
-          .sort((a: any, b: any) => a.horseNumber - b.horseNumber)
+          .sort((a: any, b: any) => {
+            const ra = resultMap.get(a.horseNumber)?.ranking ?? Infinity;
+            const rb = resultMap.get(b.horseNumber)?.ranking ?? Infinity;
+            return ra !== rb ? ra - rb : a.horseNumber - b.horseNumber;
+          })
           .map((runner: any) => {
             const analysisResult = resultMap.get(runner.horseNumber);
             return (
