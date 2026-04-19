@@ -45,6 +45,7 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         ELECTRON_EXTRA_LAUNCH_ARGS: '--no-sandbox',
+        ELECTRON_DISABLE_SANDBOX: '1',
       },
     },
   ],
