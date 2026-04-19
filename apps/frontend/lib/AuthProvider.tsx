@@ -4,12 +4,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AuthContext, type User } from './auth';
 import { strapi, getAuthToken, removeAuthToken, setAuthToken, onUnauthorized } from './api';
 
+const AUTH_ENABLED = process.env.EXPO_PUBLIC_ENABLE_AUTH !== 'false';
+
+const DEV_USER: User = {
+  id: 0,
+  username: 'dev',
+  phone: '',
+  subscriptionStatus: 'active',
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(AUTH_ENABLED ? null : DEV_USER);
+  const [isLoading, setIsLoading] = useState(AUTH_ENABLED);
   const queryClient = useQueryClient();
 
   const fetchMe = useCallback(async () => {
+    if (!AUTH_ENABLED) return;
     const token = await getAuthToken();
     if (!token) {
       setUser(null);
@@ -37,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   useEffect(() => {
+    if (!AUTH_ENABLED) return;
     onUnauthorized(() => {
       setUser(null);
       queryClient.clear();
