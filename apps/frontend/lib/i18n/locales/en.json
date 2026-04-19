@@ -124,7 +124,9 @@
   "suggestion": {
     "win": "Win",
     "place": "Place",
-    "trio": "Trio"
+    "trio": "Trio",
+    "banker": "Banker",
+    "legs": "Legs"
   },
   "tabs": {
     "home": "Home",

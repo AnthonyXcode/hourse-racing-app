@@ -112,9 +112,19 @@ export default function UpcomingScreen() {
                   >
                     {t(`suggestion.${s.type}`)}
                   </Text>
-                  <XStack gap="$2" flexWrap="wrap">
-                    {s.picks.map((p) => (
-                      <XStack key={p.horseNumber} gap="$1" alignItems="center">
+                  {s.type === 'trio' && s.banker ? (
+                    <YStack gap="$1">
+                      <XStack gap="$1" alignItems="center">
+                        <Text
+                          backgroundColor="$red3"
+                          color="$red11"
+                          paddingHorizontal="$2"
+                          borderRadius="$2"
+                          fontSize="$1"
+                          fontWeight="bold"
+                        >
+                          {t('suggestion.banker')}
+                        </Text>
                         <Text
                           backgroundColor="$yellow3"
                           color="$yellow11"
@@ -123,12 +133,59 @@ export default function UpcomingScreen() {
                           fontSize="$2"
                           fontWeight="bold"
                         >
-                          #{p.horseNumber}
+                          #{s.banker.horseNumber}
                         </Text>
-                        <Text fontSize="$3">{p.horseName}</Text>
+                        <Text fontSize="$3">{s.banker.horseName}</Text>
                       </XStack>
-                    ))}
-                  </XStack>
+                      {s.legs && s.legs.length > 0 && (
+                        <XStack gap="$2" flexWrap="wrap" alignItems="center">
+                          <Text
+                            backgroundColor="$orange3"
+                            color="$orange11"
+                            paddingHorizontal="$2"
+                            borderRadius="$2"
+                            fontSize="$1"
+                            fontWeight="bold"
+                          >
+                            {t('suggestion.legs')}
+                          </Text>
+                          {s.legs.map((p) => (
+                            <XStack key={p.horseNumber} gap="$1" alignItems="center">
+                              <Text
+                                backgroundColor="$yellow3"
+                                color="$yellow11"
+                                paddingHorizontal="$2"
+                                borderRadius="$2"
+                                fontSize="$2"
+                                fontWeight="bold"
+                              >
+                                #{p.horseNumber}
+                              </Text>
+                              <Text fontSize="$3">{p.horseName}</Text>
+                            </XStack>
+                          ))}
+                        </XStack>
+                      )}
+                    </YStack>
+                  ) : (
+                    <XStack gap="$2" flexWrap="wrap">
+                      {s.picks.map((p) => (
+                        <XStack key={p.horseNumber} gap="$1" alignItems="center">
+                          <Text
+                            backgroundColor="$yellow3"
+                            color="$yellow11"
+                            paddingHorizontal="$2"
+                            borderRadius="$2"
+                            fontSize="$2"
+                            fontWeight="bold"
+                          >
+                            #{p.horseNumber}
+                          </Text>
+                          <Text fontSize="$3">{p.horseName}</Text>
+                        </XStack>
+                      ))}
+                    </XStack>
+                  )}
                 </YStack>
               ))}
             </YStack>

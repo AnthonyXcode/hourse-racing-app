@@ -79,12 +79,12 @@ export function deriveWinPicks(results: HorseResult[]): DerivedPick[] {
     .map(({ horseNumber, horseName }) => ({ horseNumber, horseName }));
 }
 
-const TRIO_WIN_PROB_THRESHOLD = 0.25;
+const TRIO_PLACE_PROB_THRESHOLD = 0.20;
 const TRIO_WIN_ODDS_THRESHOLD = 10;
 
 /**
  * Trio bet: ranking #1 as banker, legs are other horses with
- * winProbability > 25% or actual market winOdds < 10.
+ * MC Place% > 20% or win odds < 10.
  */
 export function deriveTrioPicks(results: HorseResult[]): {
   banker: DerivedPick | null;
@@ -103,7 +103,7 @@ export function deriveTrioPicks(results: HorseResult[]): {
     .filter(
       (r) =>
         r.horseNumber !== banker.horseNumber &&
-        (r.winProbability > TRIO_WIN_PROB_THRESHOLD ||
+        (r.placeProbability > TRIO_PLACE_PROB_THRESHOLD ||
           (r.winOdds != null && r.winOdds < TRIO_WIN_ODDS_THRESHOLD))
     )
     .sort((a, b) => a.ranking - b.ranking)

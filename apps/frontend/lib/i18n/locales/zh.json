@@ -124,7 +124,9 @@
   "suggestion": {
     "win": "獨贏",
     "place": "位置",
-    "trio": "單T"
+    "trio": "單T",
+    "banker": "膽",
+    "legs": "腳"
   },
   "tabs": {
     "home": "首頁",
