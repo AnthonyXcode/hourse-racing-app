@@ -64,7 +64,10 @@
     "leg": "腳",
     "hit": "命中",
     "miss": "未中",
-    "actualResult": "實際前3名"
+    "actualResult": "實際前3名",
+    "odds": "賠率",
+    "invest": "投注",
+    "return": "回報"
   },
   "upcoming": {
     "title": "即將到來",

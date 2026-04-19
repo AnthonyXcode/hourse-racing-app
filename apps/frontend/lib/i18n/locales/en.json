@@ -64,7 +64,10 @@
     "leg": "Leg",
     "hit": "Hit",
     "miss": "Miss",
-    "actualResult": "Actual top 3"
+    "actualResult": "Actual top 3",
+    "odds": "Odds",
+    "invest": "Invest",
+    "return": "Return"
   },
   "upcoming": {
     "title": "Upcoming",

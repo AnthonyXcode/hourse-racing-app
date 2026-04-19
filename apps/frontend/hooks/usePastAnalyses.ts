@@ -21,6 +21,12 @@ export interface PastPlacing {
   finishPosition: number;
 }
 
+export interface RaceDividends {
+  winDividend?: number;
+  placeDividends?: number[];
+  trioDividend?: number;
+}
+
 export interface PastItem {
   analysisId: string;
   meetingKey: string;
@@ -30,6 +36,11 @@ export interface PastItem {
   analyzedAt: string;
   suggestions: (DerivedSuggestion & { result: AccuracyResult })[];
   placings: PastPlacing[];
+  /** Horse number → actual finish position for all runners */
+  finishPositionMap: Record<number, number>;
+  /** Horse number → win odds for all runners */
+  winOddsMap: Record<number, number>;
+  dividends: RaceDividends;
 }
 
 export function usePastAnalyses() {
@@ -50,6 +61,7 @@ export function usePastAnalyses() {
           populate: {
             0: 'results',
             1: 'results.finishOrder',
+            2: 'results.placeDividends',
           },
         }),
       ]);
@@ -99,6 +111,25 @@ export function usePastAnalyses() {
           }))
           .sort((a, b) => a.finishPosition - b.finishPosition);
 
+        const finishPositionMap: Record<number, number> = {};
+        const winOddsMap: Record<number, number> = {};
+        for (const f of finishOrder) {
+          if (f.horseNumber != null && f.finishPosition != null) {
+            finishPositionMap[f.horseNumber] = f.finishPosition;
+          }
+          if (f.horseNumber != null && f.winOdds != null) {
+            winOddsMap[f.horseNumber] = f.winOdds;
+          }
+        }
+
+        const dividends: RaceDividends = {
+          winDividend: raceResult?.winDividend ?? undefined,
+          placeDividends: (raceResult?.placeDividends ?? [])
+            .map((d) => d.amount)
+            .filter((a): a is number => a != null),
+          trioDividend: raceResult?.trioDividend ?? undefined,
+        };
+
         items.push({
           analysisId: a.id?.toString() ?? a.documentId ?? '',
           meetingKey: key,
@@ -108,6 +139,9 @@ export function usePastAnalyses() {
           analyzedAt: a.analyzedAt,
           suggestions,
           placings,
+          finishPositionMap,
+          winOddsMap,
+          dividends,
         });
       }
 

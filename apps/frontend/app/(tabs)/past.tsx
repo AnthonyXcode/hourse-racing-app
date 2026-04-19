@@ -16,7 +16,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePastAnalyses } from '../../hooks';
-import type { PastItem, PastPlacing } from '../../hooks/usePastAnalyses';
+import type { PastItem, PastPlacing, RaceDividends } from '../../hooks/usePastAnalyses';
 import type {
   DerivedPick,
   DerivedSuggestion,
@@ -71,18 +71,61 @@ function isHit(horseNumber: number, placings: PastPlacing[]): boolean {
   return placings.some((p) => p.horseNumber === horseNumber);
 }
 
+const BET_UNIT = 10;
+
+function computeBetInfo(
+  type: BetType,
+  suggestion: SuggestionRow['suggestion'],
+  item: PastItem,
+): { invest: number; payout: number } {
+  const { dividends, finishPositionMap, placings } = item;
+
+  if (type === 'place') {
+    const pick = suggestion.picks[0];
+    if (!pick) return { invest: BET_UNIT, payout: 0 };
+    const pos = finishPositionMap[pick.horseNumber];
+    if (pos != null && pos <= 3 && dividends.placeDividends && dividends.placeDividends.length >= pos) {
+      return { invest: BET_UNIT, payout: dividends.placeDividends[pos - 1]! };
+    }
+    return { invest: BET_UNIT, payout: 0 };
+  }
+
+  if (type === 'win') {
+    const numPicks = suggestion.picks.length;
+    const invest = BET_UNIT * numPicks;
+    const winner = suggestion.picks.find((p) => finishPositionMap[p.horseNumber] === 1);
+    if (winner && dividends.winDividend) {
+      return { invest, payout: dividends.winDividend };
+    }
+    return { invest, payout: 0 };
+  }
+
+  if (type === 'trio') {
+    const placedNumbers = placings.map((p) => p.horseNumber);
+    const pickedNumbers = new Set(suggestion.picks.map((p) => p.horseNumber));
+    const allCovered = placedNumbers.length >= 3 && placedNumbers.every((n) => pickedNumbers.has(n));
+    if (allCovered && dividends.trioDividend) {
+      return { invest: BET_UNIT, payout: dividends.trioDividend };
+    }
+    return { invest: BET_UNIT, payout: 0 };
+  }
+
+  return { invest: BET_UNIT, payout: 0 };
+}
+
 function PickTag({
   pick,
-  placings,
+  hit,
   role,
+  finishPosition,
   t,
 }: {
   pick: DerivedPick;
-  placings: PastPlacing[];
+  hit: boolean;
   role?: 'banker' | 'leg';
+  finishPosition?: number;
   t: (key: string) => string;
 }) {
-  const hit = isHit(pick.horseNumber, placings);
   return (
     <XStack
       gap="$1"
@@ -102,24 +145,46 @@ function PickTag({
       <Text fontSize="$2" fontWeight={hit ? 'bold' : '400'} color={hit ? '$green11' : '$gray11'}>
         #{pick.horseNumber} {pick.horseName}
       </Text>
+      {finishPosition != null && (
+        <Text fontSize={10} color={hit ? '$green11' : '$red10'}>
+          (#{finishPosition})
+        </Text>
+      )}
       {hit && <Text fontSize={10}>&#10003;</Text>}
     </XStack>
   );
 }
 
+function sumBetTotals(rows: SuggestionRow[], type: BetType) {
+  let invest = 0;
+  let payout = 0;
+  for (const row of rows) {
+    const info = computeBetInfo(type, row.suggestion, row.item);
+    invest += info.invest;
+    payout += info.payout;
+  }
+  return { invest, payout, profit: payout - invest };
+}
+
 function SummaryBar({
   stats,
+  betTotals,
   t,
 }: {
   stats: ReturnType<typeof countResults>;
+  betTotals?: { invest: number; payout: number; profit: number };
   t: (key: string) => string;
 }) {
+  const roi = betTotals && betTotals.invest > 0
+    ? ((betTotals.payout - betTotals.invest) / betTotals.invest) * 100
+    : undefined;
+
   return (
-    <XStack gap="$3" alignItems="center" paddingVertical="$2">
-      <Text fontSize="$3" fontWeight="bold" color="$green10">
-        {stats.rate.toFixed(0)}%
-      </Text>
-      <XStack gap="$2">
+    <YStack gap="$1" paddingVertical="$2" alignItems="flex-end">
+      <XStack gap="$2" alignItems="center">
+        <Text fontSize="$3" fontWeight="bold" color="$green10">
+          {stats.rate.toFixed(0)}%
+        </Text>
         <XStack gap="$1" alignItems="center">
           <Text fontSize={8} color="$green10">&#9679;</Text>
           <Text fontSize="$2" color="$gray11">{stats.correct}</Text>
@@ -132,10 +197,51 @@ function SummaryBar({
           <Text fontSize={8} color="$red10">&#9679;</Text>
           <Text fontSize="$2" color="$gray11">{stats.incorrect}</Text>
         </XStack>
+        <Text fontSize="$2" color="$gray9">({stats.total})</Text>
       </XStack>
-      <Text fontSize="$2" color="$gray9">({stats.total})</Text>
-    </XStack>
+
+      {betTotals && betTotals.invest > 0 && (
+        <Text
+          fontSize="$2"
+          fontWeight="bold"
+          color={betTotals.profit > 0 ? '$green10' : betTotals.profit < 0 ? '$red10' : '$gray9'}
+        >
+          {t('past.invest')}: ${betTotals.invest}  {t('past.return')}: ${betTotals.payout.toFixed(1)}
+        </Text>
+      )}
+
+      {roi != null && (
+        <Text
+          fontSize="$2"
+          fontWeight="bold"
+          color={roi > 0 ? '$green10' : roi < 0 ? '$red10' : '$gray9'}
+        >
+          ROI: {roi > 0 ? '+' : ''}{roi.toFixed(0)}%
+        </Text>
+      )}
+    </YStack>
   );
+}
+
+interface MeetingGroup {
+  key: string;
+  date: string;
+  venue: string;
+  rows: SuggestionRow[];
+}
+
+function groupByMeeting(rows: SuggestionRow[]): MeetingGroup[] {
+  const map = new Map<string, MeetingGroup>();
+  for (const row of rows) {
+    const key = `${row.item.raceDate}_${row.item.venue}`;
+    let group = map.get(key);
+    if (!group) {
+      group = { key, date: row.item.raceDate, venue: row.item.venue, rows: [] };
+      map.set(key, group);
+    }
+    group.rows.push(row);
+  }
+  return Array.from(map.values());
 }
 
 function RaceRow({
@@ -149,18 +255,24 @@ function RaceRow({
 }) {
   const { item, suggestion } = row;
   const placings = item.placings ?? [];
+  const posMap = item.finishPositionMap ?? {};
+  const oddsMap = item.winOddsMap ?? {};
+  const betInfo = computeBetInfo(type, suggestion, item);
+  const profit = betInfo.payout - betInfo.invest;
+
+  const checkHit = (horseNumber: number): boolean => {
+    if (type === 'win') {
+      return posMap[horseNumber] === 1;
+    }
+    return isHit(horseNumber, placings);
+  };
 
   return (
-    <YStack gap="$2" paddingVertical="$2">
+    <YStack gap="$2" paddingVertical="$1.5">
       <XStack justifyContent="space-between" alignItems="center">
-        <XStack gap="$2" alignItems="center">
-          <Text fontSize="$2" fontWeight="bold">
-            {item.raceDate}
-          </Text>
-          <Text fontSize="$2" color="$gray11">
-            {item.venue} R{item.raceNo}
-          </Text>
-        </XStack>
+        <Text fontSize="$2" color="$gray11">
+          R{item.raceNo}
+        </Text>
         <Text
           fontSize="$2"
           fontWeight="bold"
@@ -175,25 +287,125 @@ function RaceRow({
       </XStack>
 
       <XStack flexWrap="wrap" gap="$1">
-        {type === 'trio' && suggestion.banker ? (
+        {type === 'place' ? (
+          suggestion.picks.map((pick) => (
+            <PickTag
+              key={pick.horseNumber}
+              pick={pick}
+              hit={checkHit(pick.horseNumber)}
+              finishPosition={posMap[pick.horseNumber]}
+              t={t}
+            />
+          ))
+        ) : type === 'trio' && suggestion.banker ? (
           <>
-            <PickTag pick={suggestion.banker} placings={placings} role="banker" t={t} />
+            <PickTag pick={suggestion.banker} hit={checkHit(suggestion.banker.horseNumber)} role="banker" t={t} />
             {(suggestion.legs ?? []).map((leg) => (
-              <PickTag key={leg.horseNumber} pick={leg} placings={placings} role="leg" t={t} />
+              <PickTag key={leg.horseNumber} pick={leg} hit={checkHit(leg.horseNumber)} role="leg" t={t} />
             ))}
           </>
         ) : (
           suggestion.picks.map((pick) => (
-            <PickTag key={pick.horseNumber} pick={pick} placings={placings} t={t} />
+            <PickTag key={pick.horseNumber} pick={pick} hit={checkHit(pick.horseNumber)} t={t} />
           ))
         )}
       </XStack>
 
-      {placings.length > 0 && (
+      {type !== 'place' && placings.length > 0 && (
         <Text fontSize={11} color="$gray9">
           {t('past.actualResult')}: {placings.map((p) => `${p.finishPosition}. #${p.horseNumber} ${p.horseName}`).join('  ')}
         </Text>
       )}
+
+      <XStack gap="$3" alignItems="center">
+        {type !== 'trio' && (
+          <Text fontSize={11} color="$gray9">
+            {t('past.odds')}: {suggestion.picks.map((p) => {
+              const o = oddsMap[p.horseNumber];
+              return `#${p.horseNumber} ${o != null ? o.toFixed(1) : '-'}`;
+            }).join('  ')}
+          </Text>
+        )}
+        <Text fontSize={11} color="$gray9">
+          {t('past.invest')}: ${betInfo.invest}
+        </Text>
+        <Text fontSize={11} fontWeight="bold" color={profit > 0 ? '$green10' : profit < 0 ? '$red10' : '$gray9'}>
+          {t('past.return')}: ${betInfo.payout > 0 ? betInfo.payout.toFixed(1) : '0'}
+        </Text>
+      </XStack>
+    </YStack>
+  );
+}
+
+function MeetingGroupRow({
+  meeting,
+  type,
+  t,
+}: {
+  meeting: MeetingGroup;
+  type: BetType;
+  t: (key: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const stats = countResults(meeting.rows);
+  const totals = sumBetTotals(meeting.rows, type);
+
+  return (
+    <YStack>
+      <YStack
+        paddingVertical="$2"
+        gap="$1"
+        pressStyle={{ opacity: 0.7 }}
+        onPress={() => setOpen((v) => !v)}
+        cursor="pointer"
+      >
+        <XStack justifyContent="space-between" alignItems="center">
+          <XStack gap="$2" alignItems="center">
+            <Text fontSize="$3" fontWeight="bold">
+              {meeting.date}
+            </Text>
+            <Text fontSize="$2" color="$gray11">
+              {meeting.venue}
+            </Text>
+          </XStack>
+          <Text fontSize={12} color="$gray9">{open ? '▲' : '▼'}</Text>
+        </XStack>
+
+        <XStack gap="$2" alignItems="center" flexWrap="wrap">
+          <XStack gap="$1" alignItems="center">
+            <Text fontSize={8} color="$green10">&#9679;</Text>
+            <Text fontSize="$1" color="$gray11">{stats.correct}</Text>
+          </XStack>
+          <XStack gap="$1" alignItems="center">
+            <Text fontSize={8} color="$yellow10">&#9679;</Text>
+            <Text fontSize="$1" color="$gray11">{stats.partial}</Text>
+          </XStack>
+          <XStack gap="$1" alignItems="center">
+            <Text fontSize={8} color="$red10">&#9679;</Text>
+            <Text fontSize="$1" color="$gray11">{stats.incorrect}</Text>
+          </XStack>
+          <Text fontSize="$1" color="$gray9">/{stats.total}</Text>
+          <Text
+            fontSize="$1"
+            fontWeight="bold"
+            color={totals.profit > 0 ? '$green10' : totals.profit < 0 ? '$red10' : '$gray9'}
+          >
+            ${totals.invest}→${totals.payout.toFixed(1)}
+          </Text>
+        </XStack>
+      </YStack>
+
+      {open && (
+        <YStack paddingLeft="$2">
+          {meeting.rows.map((row, i) => (
+            <YStack key={row.item.meetingKey}>
+              {i > 0 && <Separator borderColor="$gray5" />}
+              <RaceRow row={row} type={type} t={t} />
+            </YStack>
+          ))}
+        </YStack>
+      )}
+      <Separator borderWidth={2} borderColor="$gray8" />
     </YStack>
   );
 }
@@ -210,6 +422,9 @@ function BetSection({
   const stats = countResults(rows);
   if (rows.length === 0) return null;
 
+  const meetings = groupByMeeting(rows);
+  const betTotals = sumBetTotals(rows, type);
+
   return (
     <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
       <YStack gap="$1">
@@ -217,16 +432,13 @@ function BetSection({
           <Text fontSize="$5" fontWeight="bold">
             {t(`suggestion.${type}`)}
           </Text>
-          <SummaryBar stats={stats} t={t} />
+          <SummaryBar stats={stats} betTotals={betTotals} t={t} />
         </XStack>
 
         <Separator />
 
-        {rows.map((row) => (
-          <YStack key={row.item.meetingKey}>
-            <RaceRow row={row} type={type} t={t} />
-            <Separator />
-          </YStack>
+        {meetings.map((meeting) => (
+          <MeetingGroupRow key={meeting.key} meeting={meeting} type={type} t={t} />
         ))}
       </YStack>
     </Card>
