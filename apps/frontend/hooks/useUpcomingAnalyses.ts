@@ -4,6 +4,7 @@ import {
   latestAnalysisPerRace,
   deriveSuggestions,
   meetingKeyFromAnalysis,
+  toHorseResults,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
 import { useAuth } from '../lib/auth';
@@ -28,7 +29,7 @@ export function useUpcomingAnalyses(enabled: boolean) {
       const today = new Date().toISOString().slice(0, 10);
       const res = await AnalysisService.getAnalyses({
         filters: { analyzedAt: { $gte: today } },
-        populate: { results: true, meeting: true } as any,
+        populate: { results: true, meeting: true },
         sort: 'analyzedAt:desc',
         paginationPageSize: 200,
       });
@@ -53,11 +54,14 @@ export function useUpcomingAnalyses(enabled: boolean) {
           raceNo: parseInt(raceNoStr, 10),
           raceName: a.meeting?.raceName,
           analyzedAt: a.analyzedAt,
-          suggestions: deriveSuggestions(results as any),
+          suggestions: deriveSuggestions(toHorseResults(results)),
         });
       }
 
-      return items.sort((a, b) => a.raceDate.localeCompare(b.raceDate) || a.raceNo - b.raceNo);
+      return items.sort(
+        (a, b) =>
+          a.raceDate.localeCompare(b.raceDate) || a.raceNo - b.raceNo,
+      );
     },
   });
 }

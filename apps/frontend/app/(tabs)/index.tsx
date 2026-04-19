@@ -2,7 +2,7 @@ import { YStack, XStack, Text, H3, Card, Paragraph, Spinner, Button } from 'tama
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../lib/auth';
@@ -82,25 +82,46 @@ export default function HomeScreen() {
         </Card>
 
         <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
-          <YStack gap="$2">
+          <YStack gap="$3">
             <Text fontWeight="bold" fontSize="$5">{t('home.accuracy')}</Text>
             {accuracyStats ? (
-              <XStack gap="$4">
-                <YStack alignItems="center">
-                  <Text fontSize="$8" fontWeight="bold" color="$green10">
-                    {accuracyStats.rate.toFixed(1)}%
+              <YStack gap="$3">
+                <XStack gap="$3">
+                  {(['place', 'win', 'trio'] as const).map((type) => {
+                    const s = accuracyStats[type];
+                    return (
+                      <YStack
+                        key={type}
+                        flex={1}
+                        alignItems="center"
+                        gap="$1"
+                        padding="$2"
+                        borderRadius="$3"
+                        backgroundColor="$gray2"
+                      >
+                        <Text fontSize="$3" fontWeight="600" color="$gray11" textTransform="uppercase">
+                          {t(`suggestion.${type}`)}
+                        </Text>
+                        <Text fontSize="$7" fontWeight="bold" color={s.rate >= 50 ? '$green10' : s.rate >= 25 ? '$yellow10' : '$gray10'}>
+                          {s.rate.toFixed(0)}%
+                        </Text>
+                        <Text fontSize="$2" color="$gray9">
+                          {s.correct}/{s.total}
+                        </Text>
+                      </YStack>
+                    );
+                  })}
+                </XStack>
+                <XStack justifyContent="center" gap="$2" alignItems="center">
+                  <Text fontSize="$3" color="$gray11">{t('home.overall')}:</Text>
+                  <Text fontSize="$4" fontWeight="bold" color="$green10">
+                    {accuracyStats.overall.rate.toFixed(1)}%
                   </Text>
-                  <Paragraph color="$gray11">{t('home.hitRate')}</Paragraph>
-                </YStack>
-                <YStack alignItems="center">
-                  <Text fontSize="$6" fontWeight="bold">{accuracyStats.correct}</Text>
-                  <Paragraph color="$gray11">{t('home.correct')}</Paragraph>
-                </YStack>
-                <YStack alignItems="center">
-                  <Text fontSize="$6" fontWeight="bold">{accuracyStats.total}</Text>
-                  <Paragraph color="$gray11">{t('home.total')}</Paragraph>
-                </YStack>
-              </XStack>
+                  <Text fontSize="$3" color="$gray9">
+                    ({accuracyStats.overall.correct}/{accuracyStats.overall.total})
+                  </Text>
+                </XStack>
+              </YStack>
             ) : (
               <Paragraph color="$gray11">{t('home.noDataYet')}</Paragraph>
             )}

@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import type { History, HistoryRaceResultComponent } from '@horse-racing/api-client';
 import { AnalysisService, HistoryService } from '@horse-racing/api-client';
 import {
   latestAnalysisPerRace,
   deriveSuggestions,
   checkAccuracy,
   meetingKeyFromAnalysis,
+  toHorseResults,
   type AccuracyResult,
   type DerivedSuggestion,
 } from '../lib/analysis-helpers';
@@ -30,21 +32,22 @@ export function usePastAnalyses() {
 
       const [analysesRes, historiesRes] = await Promise.all([
         AnalysisService.getAnalyses({
-          populate: { results: true, meeting: true } as any,
+          populate: { results: true, meeting: true },
           sort: 'analyzedAt:desc',
           paginationPageSize: 100,
         }),
         HistoryService.getHistories({
           sort: 'name:desc',
           paginationPageSize: 15,
+          populate: '*',
         }),
       ]);
 
       const latest = latestAnalysisPerRace(analysesRes.data ?? []);
 
-      const historyMap = new Map<string, any>();
+      const historyMap = new Map<string, History>();
       for (const h of historiesRes.data ?? []) {
-        if ((h as any).name) historyMap.set((h as any).name, h);
+        if (h.name) historyMap.set(h.name, h);
       }
 
       const items: PastItem[] = [];
@@ -61,14 +64,16 @@ export function usePastAnalyses() {
         const raceNo = parseInt(raceNoStr, 10);
         const dv = `${raceDate}_${venue}`;
         const history = historyMap.get(dv);
-        const races: any[] = (history as any)?.races ?? [];
-        const raceResult = races.find((r: any) => r.raceNumber === raceNo);
-        const placings = raceResult?.finishPlacings ?? [];
+        const races: HistoryRaceResultComponent[] = history?.results ?? [];
+        const raceResult = races.find((r) => r.raceNumber === raceNo);
+        const finishOrder = raceResult?.finishOrder ?? [];
 
-        const suggestions = deriveSuggestions(results as any).map((s) => ({
-          ...s,
-          result: checkAccuracy(s.type, s.picks, placings),
-        }));
+        const suggestions = deriveSuggestions(toHorseResults(results)).map(
+          (s) => ({
+            ...s,
+            result: checkAccuracy(s.type, s.picks, finishOrder),
+          }),
+        );
 
         items.push({
           analysisId: a.id?.toString() ?? a.documentId ?? '',
@@ -81,7 +86,10 @@ export function usePastAnalyses() {
         });
       }
 
-      return items.sort((a, b) => b.raceDate.localeCompare(a.raceDate) || a.raceNo - b.raceNo);
+      return items.sort(
+        (a, b) =>
+          b.raceDate.localeCompare(a.raceDate) || a.raceNo - b.raceNo,
+      );
     },
   });
 }
