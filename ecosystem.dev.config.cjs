@@ -44,6 +44,7 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'development',
+        ELECTRON_EXTRA_LAUNCH_ARGS: '--no-sandbox',
       },
     },
   ],

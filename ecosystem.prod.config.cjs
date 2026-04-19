@@ -4,7 +4,7 @@ const strapiDir = path.join(__dirname, 'apps', 'strapi');
 const frontendDir = path.join(__dirname, 'apps', 'frontend');
 
 /** Strapi production API port. */
-const PROD_STRAPI_PORT = 1337;
+const PROD_STRAPI_PORT = 1339;
 
 /** PM2: Strapi start + static web (`serve dist`). Run `pnpm build:frontend` before first start. */
 module.exports = {
