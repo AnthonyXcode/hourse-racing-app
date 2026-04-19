@@ -253,6 +253,7 @@ function RaceRow({
   type: BetType;
   t: (key: string) => string;
 }) {
+  const router = useRouter();
   const { item, suggestion } = row;
   const placings = item.placings ?? [];
   const posMap = item.finishPositionMap ?? {};
@@ -268,7 +269,13 @@ function RaceRow({
   };
 
   return (
-    <YStack gap="$2" paddingVertical="$1.5">
+    <YStack
+      gap="$2"
+      paddingVertical="$1.5"
+      pressStyle={{ opacity: 0.7 }}
+      onPress={() => router.push(`/race/${item.meetingKey}`)}
+      cursor="pointer"
+    >
       <XStack justifyContent="space-between" alignItems="center">
         <Text fontSize="$2" color="$gray11">
           R{item.raceNo}
