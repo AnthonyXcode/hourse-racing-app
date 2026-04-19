@@ -45,7 +45,8 @@
     "total": "Total",
     "noDataYet": "No data yet",
     "pastResults": "Past Results",
-    "upcoming": "Upcoming"
+    "upcoming": "Upcoming",
+    "signInPrompt": "Sign in for personalized analysis and more features."
   },
   "past": {
     "title": "Past Analysis",

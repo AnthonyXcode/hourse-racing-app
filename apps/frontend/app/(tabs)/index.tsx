@@ -22,25 +22,6 @@ export default function HomeScreen() {
     queryClient.invalidateQueries({ queryKey: ['accuracyStats'] });
   }, [queryClient]);
 
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A1628' }} edges={['bottom']}>
-        <YStack flex={1} justifyContent="center" alignItems="center" padding="$4" gap="$4">
-          <H3 color="white">{t('home.welcome')}</H3>
-          <Paragraph color="$gray10" textAlign="center">
-            {t('home.tagline')}
-          </Paragraph>
-          <Button size="$5" theme="active" onPress={() => router.push('/(auth)/login')}>
-            {t('auth.signIn')}
-          </Button>
-          <Button size="$4" variant="outlined" theme="gray" borderColor="$gray8" onPress={() => router.push('/(auth)/register')}>
-            <Text color="white">{t('auth.createAccount')}</Text>
-          </Button>
-        </YStack>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F1F5F9' }} edges={['bottom']}>
       <ScrollView
@@ -50,8 +31,17 @@ export default function HomeScreen() {
       >
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack gap="$2">
-            <Paragraph color="$gray11">{t('home.welcomeBack')}</Paragraph>
-            <H3>{user?.username ?? 'User'}</H3>
+            {isAuthenticated ? (
+              <>
+                <Paragraph color="$gray11">{t('home.welcomeBack')}</Paragraph>
+                <H3>{user?.username ?? 'User'}</H3>
+              </>
+            ) : (
+              <>
+                <H3>{t('home.welcome')}</H3>
+                <Paragraph color="$gray11">{t('home.tagline')}</Paragraph>
+              </>
+            )}
           </YStack>
           <Button
             size="$3"
@@ -63,6 +53,17 @@ export default function HomeScreen() {
             {isFetching ? <Spinner size="small" /> : <Text fontSize={18}>↻</Text>}
           </Button>
         </XStack>
+
+        {!isAuthenticated && (
+          <Card padding="$4" borderWidth={1} borderColor="$blue6" borderRadius="$4" backgroundColor="$blue2">
+            <XStack justifyContent="space-between" alignItems="center" gap="$3">
+              <Paragraph color="$blue11" flex={1}>{t('home.signInPrompt')}</Paragraph>
+              <Button size="$3" theme="active" onPress={() => router.push('/(auth)/login')}>
+                {t('auth.signIn')}
+              </Button>
+            </XStack>
+          </Card>
+        )}
 
         <Card padding="$4" borderWidth={1} borderColor="$borderColor" borderRadius="$4">
           <YStack gap="$2">
