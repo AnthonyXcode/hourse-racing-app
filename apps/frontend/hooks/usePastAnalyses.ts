@@ -95,7 +95,7 @@ export function usePastAnalyses() {
         const suggestions = deriveSuggestions(horseResults).map(
           (s) => ({
             ...s,
-            result: checkAccuracy(s.type, s.picks, finishOrder),
+            result: checkAccuracy(s.type, s.picks, finishOrder, s.banker),
           }),
         );
 

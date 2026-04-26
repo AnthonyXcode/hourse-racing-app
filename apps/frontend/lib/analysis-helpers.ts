@@ -158,13 +158,15 @@ export type AccuracyResult = 'correct' | 'partial' | 'incorrect' | 'pending';
  *
  * Place: ranking #1 finishes in top 3 → correct.
  * Win:   any of top-3 ranked wins → correct; any places top 3 → partial.
- * Trio:  banker + legs cover all 3 placed horses → correct;
- *        at least one picked horse placed → partial.
+ * Trio:  With banker (膽拖): banker outside top 3 → partial; banker in top 3 and
+ *        all 3 placers in picks → correct; else if any pick placed → partial.
+ *        Without banker: ≥3 picks in frame → correct; any pick placed → partial.
  */
 export function checkAccuracy(
   type: 'win' | 'place' | 'trio',
   picks: DerivedPick[],
   finishOrder: HistoryFinishPlacingComponent[],
+  trioBanker?: DerivedPick,
 ): AccuracyResult {
   if (!finishOrder || finishOrder.length === 0) return 'pending';
 
@@ -175,6 +177,7 @@ export function checkAccuracy(
   const placeNumbers = finishOrder
     .filter((f) => f.finishPosition != null && f.finishPosition <= 3)
     .map((f) => f.horseNumber!);
+  const placeNumberSet = new Set(placeNumbers);
 
   if (type === 'place') {
     return placeNumbers.some((n) => pickedNumbers.has(n)) ? 'correct' : 'incorrect';
@@ -187,6 +190,9 @@ export function checkAccuracy(
   }
 
   if (type === 'trio') {
+    if (trioBanker && !placeNumberSet.has(trioBanker.horseNumber)) {
+      return 'partial';
+    }
     const hits = placeNumbers.filter((n) => pickedNumbers.has(n));
     if (hits.length >= 3) return 'correct';
     if (hits.length > 0) return 'partial';

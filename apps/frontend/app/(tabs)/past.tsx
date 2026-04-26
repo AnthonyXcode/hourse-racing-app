@@ -73,6 +73,22 @@ function isHit(horseNumber: number, placings: PastPlacing[]): boolean {
 
 const BET_UNIT = 10;
 
+/** HK Trio 膽拖: 1 banker + n legs → C(n,2) combinations at $10 each. No banker → C(k,3) from k picks. */
+function trioCombinationCount(suggestion: SuggestionRow['suggestion']): number {
+  const { banker, legs, picks } = suggestion;
+  if (banker && legs && legs.length > 0) {
+    const n = legs.length;
+    return n >= 2 ? (n * (n - 1)) / 2 : 0;
+  }
+  if (banker && picks.length > 1) {
+    const n = picks.length - 1;
+    return n >= 2 ? (n * (n - 1)) / 2 : 0;
+  }
+  const k = picks.length;
+  if (k < 3) return 0;
+  return (k * (k - 1) * (k - 2)) / 6;
+}
+
 function computeBetInfo(
   type: BetType,
   suggestion: SuggestionRow['suggestion'],
@@ -101,13 +117,18 @@ function computeBetInfo(
   }
 
   if (type === 'trio') {
+    const combos = trioCombinationCount(suggestion);
+    const invest = BET_UNIT * combos;
     const placedNumbers = placings.map((p) => p.horseNumber);
     const pickedNumbers = new Set(suggestion.picks.map((p) => p.horseNumber));
     const allCovered = placedNumbers.length >= 3 && placedNumbers.every((n) => pickedNumbers.has(n));
-    if (allCovered && dividends.trioDividend) {
-      return { invest: BET_UNIT, payout: dividends.trioDividend };
+    const banker = suggestion.banker;
+    const bankerInFrame =
+      !banker || placings.some((p) => p.horseNumber === banker.horseNumber);
+    if (allCovered && bankerInFrame && dividends.trioDividend) {
+      return { invest, payout: dividends.trioDividend };
     }
-    return { invest: BET_UNIT, payout: 0 };
+    return { invest, payout: 0 };
   }
 
   return { invest: BET_UNIT, payout: 0 };

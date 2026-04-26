@@ -84,7 +84,7 @@ export function useAccuracyStats() {
         const horseResults = enrichWithOdds(toHorseResults(results), finishOrder);
         const suggestions = deriveSuggestions(horseResults);
         for (const s of suggestions) {
-          const acc = checkAccuracy(s.type, s.picks, finishOrder);
+          const acc = checkAccuracy(s.type, s.picks, finishOrder, s.banker);
           if (acc === 'pending') continue;
           const c = counters[s.type];
           if (!c) continue;
