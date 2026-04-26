@@ -495,11 +495,21 @@ function formAnalyzeRace(race: Race): HorseAnalysis[] {
 // ============================================================================
 // MONTE CARLO SIMULATOR
 // ============================================================================
+// `performanceStdDev` matches apps/reference (analyze-race.ts, run-analyze-trio-report.ts):
+// Happy Valley = higher variance, Sha Tin = lower.
 
 const MC_RUNS = 10_000;
-const MC_STD_DEV = 8;
+const MC_PERFORMANCE_STDEV: Record<Venue, number> = {
+  'Happy Valley': 11,
+  'Sha Tin': 8,
+};
+
+function getMonteCarloPerformanceStdDev(venue: Venue): number {
+  return MC_PERFORMANCE_STDEV[venue] ?? 8;
+}
 
 function simulateRace(race: Race): AnalysisResultRow[] {
+  const performanceStdDev = getMonteCarloPerformanceStdDev(race.venue);
   const analyses = formAnalyzeRace(race);
   const horseMap = new Map<number, HorseAnalysis>();
   const formCountMap = new Map<number, number>();
@@ -528,7 +538,7 @@ function simulateRace(race: Race): AnalysisResultRow[] {
   for (let run = 0; run < MC_RUNS; run++) {
     const perfs: { horseNum: number; perf: number }[] = [];
     for (const [num, a] of horseMap) {
-      const variance = randomNormal(0, MC_STD_DEV);
+      const variance = randomNormal(0, performanceStdDev);
       const formVariance = randomNormal(0, (1 - a.formScore) * 5);
       perfs.push({ horseNum: num, perf: a.overallRating + variance + formVariance });
     }
