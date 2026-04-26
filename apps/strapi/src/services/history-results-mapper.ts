@@ -175,6 +175,10 @@ export function mapJsonRaceToStrapiResult(row: unknown): Record<string, unknown>
   if (td !== undefined) out.tierceDividend = td;
   const trid = numOrUndef(r.trioDividend);
   if (trid !== undefined) out.trioDividend = trid;
+  const f4 = numOrUndef(r.first4Dividend);
+  if (f4 !== undefined) out.first4Dividend = f4;
+  const qrt = numOrUndef(r.quartetDividend);
+  if (qrt !== undefined) out.quartetDividend = qrt;
 
   return out;
 }

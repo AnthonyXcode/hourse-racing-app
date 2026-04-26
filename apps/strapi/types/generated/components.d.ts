@@ -243,6 +243,8 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
     surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
     tierceDividend: Schema.Attribute.Decimal;
     trioDividend: Schema.Attribute.Decimal;
+    first4Dividend: Schema.Attribute.Decimal;
+    quartetDividend: Schema.Attribute.Decimal;
     venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
       Schema.Attribute.Required;
     winDividend: Schema.Attribute.Decimal;

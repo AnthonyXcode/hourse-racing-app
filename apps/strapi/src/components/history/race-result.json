@@ -81,6 +81,12 @@
     },
     "trioDividend": {
       "type": "decimal"
+    },
+    "first4Dividend": {
+      "type": "decimal"
+    },
+    "quartetDividend": {
+      "type": "decimal"
     }
   }
 }

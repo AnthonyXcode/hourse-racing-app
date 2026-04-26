@@ -9118,6 +9118,14 @@
           "trioDividend": {
             "type": "number",
             "format": "float"
+          },
+          "first4Dividend": {
+            "type": "number",
+            "format": "float"
+          },
+          "quartetDividend": {
+            "type": "number",
+            "format": "float"
           }
         }
       },

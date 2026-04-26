@@ -59,6 +59,10 @@ export type ScrapedRaceResult = {
   quinellaPlaceDividends?: number[];
   tierceDividend?: number;
   trioDividend?: number;
+  /** FIRST 4 (四寶) — merged pool from HKJC local results row. */
+  first4Dividend?: number;
+  /** QUARTET (四連環) — ordered 1–4 from HKJC local results. */
+  quartetDividend?: number;
 };
 
 /** Same identity fields as `history.finish-placing` minus result-only data (position, time, margin). */
@@ -473,6 +477,37 @@ export class HistoricalScraper {
     };
   }
 
+  /** Build compact header text for class/distance/going (align apps/reference/src/scrapers/historical.ts). */
+  private buildResultPageHeaderText($: cheerio.CheerioAPI): string {
+    const raceHeaderCandidates = [
+      $('.race_head, .raceHead, .race-head, .race-info, .raceInfo').text(),
+      $('table').first().text(),
+      $('table td')
+        .map((_, el) => $(el).text())
+        .get()
+        .join(' '),
+    ];
+    const raceHeaderText = raceHeaderCandidates.join(' ');
+    const pageText = $('body').text();
+    return raceHeaderText.length > 50 ? raceHeaderText : pageText;
+  }
+
+  private groupWordToNumber(value: string): string {
+    const map: Record<string, string> = { one: '1', two: '2', three: '3' };
+    return map[value.toLowerCase()] ?? value;
+  }
+
+  /** Parse "Class 4", "Group Two", "Griffin", "4 Year Olds" into a race class label. */
+  private parseClassString(classStr: string): RaceClass {
+    if (/4\s*(?:Year|Yr)\s*Olds?/i.test(classStr)) return '4 Year Olds';
+    if (/Griffin/i.test(classStr)) return 'Griffin';
+    const classDigit = classStr.match(/Class\s*(\d)/i);
+    if (classDigit) return `Class ${classDigit[1]}`;
+    const groupMatch = classStr.match(/Group\s*(\d)/i) || classStr.match(/Group\s*(One|Two|Three)/i);
+    if (groupMatch) return `Group ${this.groupWordToNumber(groupMatch[1]!)}` as RaceClass;
+    return 'Class 4';
+  }
+
   private parseResultRaceInfo($: cheerio.CheerioAPI): {
     name?: string;
     class: RaceClass;
@@ -481,31 +516,33 @@ export class HistoricalScraper {
     going: Going;
     prizeMoney: number;
   } {
-    const pageText = $('body').text();
-    const raceInfoCells = $('table td')
-      .map((_, el) => $(el).text())
-      .get()
-      .join(' ');
-    const allText = `${pageText} ${raceInfoCells}`;
+    const allText = this.buildResultPageHeaderText($);
 
     let raceClass: RaceClass = 'Class 4';
-    const classMatch = allText.match(/Class\s*(\d)/i);
-    if (classMatch) {
-      raceClass = `Class ${classMatch[1]}`;
-    } else if (/Group\s*1/i.test(allText)) {
-      raceClass = 'Group 1';
-    } else if (/Group\s*2/i.test(allText)) {
-      raceClass = 'Group 2';
-    } else if (/Group\s*3/i.test(allText)) {
-      raceClass = 'Group 3';
-    } else if (/Griffin/i.test(allText)) {
-      raceClass = 'Griffin';
-    }
-
     let distance = 1200;
-    const distanceMatch = allText.match(/(\d{3,4})\s*M(?:\s|$|-)/i);
-    if (distanceMatch) {
-      distance = parseInt(distanceMatch[1]!, 10);
+    const combinedMatch = allText.match(
+      /(4\s*(?:Year|Yr)\s*Olds?|Griffin|Group\s*(?:\d|One|Two|Three)|Class\s*\d)\s*(?:Race\s*)?-?\s*(\d{3,4})\s*M/i
+    );
+    if (combinedMatch) {
+      const classStr = combinedMatch[1]!;
+      distance = parseInt(combinedMatch[2]!, 10);
+      raceClass = this.parseClassString(classStr);
+    } else {
+      const classMatch = allText.match(/Class\s*(\d)/i);
+      const groupMatch = allText.match(/Group\s*(\d)/i) || allText.match(/Group\s*(One|Two|Three)/i);
+      if (/4\s*(?:Year|Yr)\s*Olds?/i.test(allText)) {
+        raceClass = '4 Year Olds';
+      } else if (/Griffin/i.test(allText)) {
+        raceClass = 'Griffin';
+      } else if (classMatch) {
+        raceClass = `Class ${classMatch[1]}`;
+      } else if (groupMatch) {
+        raceClass = `Group ${this.groupWordToNumber(groupMatch[1]!)}` as RaceClass;
+      }
+      const distanceMatch = allText.match(/(\d{3,4})\s*M(?:\s|$|-)/i);
+      if (distanceMatch) {
+        distance = parseInt(distanceMatch[1]!, 10);
+      }
     }
 
     let surface: TrackSurface | null = null;
@@ -572,8 +609,8 @@ export class HistoricalScraper {
   }
 
   /**
-   * Locate HKJC results table column indices for Act. Wt., Declar. Horse Wt., Dr.
-   * (ported from reference `historical.ts`).
+   * Locate HKJC results table column indices (English / Chinese headers).
+   * Aligned with apps/reference/src/scrapers/historical.ts `findResultsTableColumnIndices`.
    */
   private findResultsTableColumnIndices($: cheerio.CheerioAPI): {
     actWt: number;
@@ -582,42 +619,48 @@ export class HistoricalScraper {
   } | null {
     const tables = $('table').toArray();
     for (const table of tables) {
-      const $ths = $(table).find('th');
-      if ($ths.length < 5) continue;
+      const $table = $(table);
+      const headerRows = $table.find('tr').toArray();
+      for (const tr of headerRows) {
+        const $ths = $(tr).find('th');
+        if ($ths.length < 8) continue;
+        const headerTexts = $ths
+          .map((_, th) => $(th).text().replace(/\s+/g, ' ').trim().toLowerCase())
+          .get();
+        const looksLikeResultsTable =
+          headerTexts.some((t) => t.includes('horse') && t.includes('no')) ||
+          headerTexts.some((t) => t.includes('馬號'));
+        if (!looksLikeResultsTable) continue;
 
-      const headerText = $ths.map((_, th) => $(th).text().replace(/\s+/g, ' ').trim()).get().join(' ');
-      const looksLikeResultsTable =
-        (/Act\.?\s*Wt/i.test(headerText) || headerText.includes('實際負磅')) &&
-        (/Horse\s*No/i.test(headerText) || headerText.includes('馬號'));
-      if (!looksLikeResultsTable) continue;
-
-      let actWt: number | undefined;
-      let declarHorseWt: number | undefined;
-      let draw: number | undefined;
-      $ths.each((i, th) => {
-        const t = $(th).text().replace(/\s+/g, ' ').trim();
-        const lower = t.toLowerCase();
-        const isDeclarHorseWt =
-          (lower.includes('declar') && lower.includes('horse') && lower.includes('wt')) ||
-          (t.includes('宣佈') && t.includes('馬匹') && t.includes('體重')) ||
-          (t.includes('馬匹') && t.includes('體重') && !t.includes('實際'));
-        const isActWt =
-          !isDeclarHorseWt &&
-          ((lower.includes('act') && lower.includes('wt') && !lower.includes('declar')) ||
-            /^act\.?\s*wt/i.test(lower) ||
-            t.includes('實際負磅') ||
-            (t.includes('實際') && t.includes('負磅')));
-        const isDraw = /^dr\.?$/i.test(lower) || lower === 'draw' || t.includes('檔位');
-        if (isDeclarHorseWt) declarHorseWt = i;
-        if (isActWt) actWt = i;
-        if (isDraw) draw = i;
-      });
-      if (actWt !== undefined) {
-        return {
-          actWt,
-          ...(declarHorseWt !== undefined ? { declarHorseWt } : {}),
-          ...(draw !== undefined ? { draw } : {}),
-        };
+        let actWt: number | undefined;
+        let declarHorseWt: number | undefined;
+        let draw: number | undefined;
+        $ths.each((i, th) => {
+          const t = $(th).text().replace(/\s+/g, ' ').trim();
+          const lower = t.toLowerCase();
+          const isDeclarHorseWt =
+            (lower.includes('declar') && lower.includes('horse') && lower.includes('wt')) ||
+            (t.includes('宣佈') && t.includes('馬匹') && t.includes('體重')) ||
+            (t.includes('馬匹') && t.includes('體重') && !t.includes('實際'));
+          const isActWt =
+            !isDeclarHorseWt &&
+            ((lower.includes('act') && lower.includes('wt') && !lower.includes('declar')) ||
+              /^act\.?\s*wt/i.test(lower) ||
+              t.includes('實際負磅') ||
+              (t.includes('實際') && t.includes('負磅')));
+          const isDraw =
+            /^dr\.?$/i.test(lower) || lower === 'draw' || t.includes('檔位');
+          if (isDeclarHorseWt) declarHorseWt = i;
+          if (isActWt) actWt = i;
+          if (isDraw) draw = i;
+        });
+        if (actWt !== undefined) {
+          return {
+            actWt,
+            ...(declarHorseWt !== undefined ? { declarHorseWt } : {}),
+            ...(draw !== undefined ? { draw } : {}),
+          };
+        }
       }
     }
     return null;
@@ -971,6 +1014,8 @@ export class HistoricalScraper {
     quinellaPlaceDividends?: number[];
     tierceDividend?: number;
     trioDividend?: number;
+    first4Dividend?: number;
+    quartetDividend?: number;
   } {
     const dividends: {
       winDividend?: number;
@@ -979,6 +1024,8 @@ export class HistoricalScraper {
       quinellaPlaceDividends?: number[];
       tierceDividend?: number;
       trioDividend?: number;
+      first4Dividend?: number;
+      quartetDividend?: number;
     } = {};
 
     const pageText = $('body').text();
@@ -1031,6 +1078,16 @@ export class HistoricalScraper {
     const trioMatch = pageText.match(/TRIO\s+[\d,]+\s+([\d,.]+)/i);
     if (trioMatch) {
       dividends.trioDividend = parseFloat(trioMatch[1]!.replace(/,/g, ''));
+    }
+
+    const f4Match = pageText.match(/FIRST\s*4\s+[\d,]+\s+([\d,.]+)/i);
+    if (f4Match) {
+      dividends.first4Dividend = parseFloat(f4Match[1]!.replace(/,/g, ''));
+    }
+
+    const quartetMatch = pageText.match(/QUARTET\s+[\d,]+\s+([\d,.]+)/i);
+    if (quartetMatch) {
+      dividends.quartetDividend = parseFloat(quartetMatch[1]!.replace(/,/g, ''));
     }
 
     return dividends;
@@ -1216,7 +1273,10 @@ export class HistoricalScraper {
     return null;
   }
 
-  /** Like parseResultRaceInfo but never throws (defaults going to Good). */
+  /**
+   * Like parseResultRaceInfo but never throws: on parse failure, uses the same
+   * header/class-distance logic as reference historical.ts, defaulting going to Good.
+   */
   private parseResultRaceInfoLenient($: cheerio.CheerioAPI): {
     name?: string;
     class: RaceClass;
@@ -1228,31 +1288,32 @@ export class HistoricalScraper {
     try {
       return this.parseResultRaceInfo($);
     } catch {
-      const pageText = $('body').text();
-      const raceInfoCells = $('table td')
-        .map((_, el) => $(el).text())
-        .get()
-        .join(' ');
-      const allText = `${pageText} ${raceInfoCells}`;
+      const allText = this.buildResultPageHeaderText($);
 
       let raceClass: RaceClass = 'Class 4';
-      const classMatch = allText.match(/Class\s*(\d)/i);
-      if (classMatch) {
-        raceClass = `Class ${classMatch[1]}`;
-      } else if (/Group\s*1/i.test(allText)) {
-        raceClass = 'Group 1';
-      } else if (/Group\s*2/i.test(allText)) {
-        raceClass = 'Group 2';
-      } else if (/Group\s*3/i.test(allText)) {
-        raceClass = 'Group 3';
-      } else if (/Griffin/i.test(allText)) {
-        raceClass = 'Griffin';
-      }
-
       let distance = 1200;
-      const distanceMatch = allText.match(/(\d{3,4})\s*M(?:\s|$|-)/i);
-      if (distanceMatch) {
-        distance = parseInt(distanceMatch[1]!, 10);
+      const combinedMatch = allText.match(
+        /(4\s*(?:Year|Yr)\s*Olds?|Griffin|Group\s*(?:\d|One|Two|Three)|Class\s*\d)\s*(?:Race\s*)?-?\s*(\d{3,4})\s*M/i
+      );
+      if (combinedMatch) {
+        raceClass = this.parseClassString(combinedMatch[1]!);
+        distance = parseInt(combinedMatch[2]!, 10);
+      } else {
+        const classMatch = allText.match(/Class\s*(\d)/i);
+        const groupMatch = allText.match(/Group\s*(\d)/i) || allText.match(/Group\s*(One|Two|Three)/i);
+        if (/4\s*(?:Year|Yr)\s*Olds?/i.test(allText)) {
+          raceClass = '4 Year Olds';
+        } else if (/Griffin/i.test(allText)) {
+          raceClass = 'Griffin';
+        } else if (classMatch) {
+          raceClass = `Class ${classMatch[1]}`;
+        } else if (groupMatch) {
+          raceClass = `Group ${this.groupWordToNumber(groupMatch[1]!)}` as RaceClass;
+        }
+        const distanceMatch = allText.match(/(\d{3,4})\s*M(?:\s|$|-)/i);
+        if (distanceMatch) {
+          distance = parseInt(distanceMatch[1]!, 10);
+        }
       }
 
       let surface: TrackSurface = 'Turf';
@@ -1260,6 +1321,34 @@ export class HistoricalScraper {
         surface = 'AWT';
       } else if (/TURF|Turf/i.test(allText)) {
         surface = 'Turf';
+      }
+
+      let going: Going = 'Good';
+      const goingMatch = allText.match(/Going\s*:\s*(\w+(?:\s+to\s+\w+)?)/i);
+      if (goingMatch) {
+        try {
+          going = this.normalizeGoing(goingMatch[1]!);
+        } catch {
+          going = 'Good';
+        }
+      } else {
+        const goingPatterns: { pattern: RegExp; value: Going }[] = [
+          { pattern: /GOOD TO FIRM/i, value: 'Good to Firm' },
+          { pattern: /GOOD TO YIELDING/i, value: 'Good to Yielding' },
+          { pattern: /YIELDING/i, value: 'Yielding' },
+          { pattern: /HEAVY/i, value: 'Heavy' },
+          { pattern: /SOFT/i, value: 'Soft' },
+          { pattern: /\bFIRM\b/i, value: 'Firm' },
+          { pattern: /\bGOOD\b/i, value: 'Good' },
+          { pattern: /WET FAST/i, value: 'Wet Fast' },
+          { pattern: /WET SLOW/i, value: 'Wet Slow' },
+        ];
+        for (const { pattern, value } of goingPatterns) {
+          if (pattern.test(allText)) {
+            going = value;
+            break;
+          }
+        }
       }
 
       let prizeMoney = 0;
@@ -1281,7 +1370,7 @@ export class HistoricalScraper {
         class: raceClass,
         distance,
         surface,
-        going: 'Good',
+        going,
         prizeMoney,
       };
     }
