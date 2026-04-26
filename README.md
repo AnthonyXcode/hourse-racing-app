@@ -104,9 +104,9 @@ Each PM2 process listens on its own port. Strapi uses `PORT` in the ecosystem `e
 | Strapi production | `ecosystem.prod.config.cjs` | `1337` |
 | Strapi dev / staging | `ecosystem.dev.config.cjs` | `1338` |
 | Frontend web production (static `dist`) | same prod config | `3001` (`start:web`) |
-| Frontend web dev (Expo) | same dev config | `3000` (`dev:web`) |
+| Frontend web dev (Expo) | same dev config | `3000` (`dev:web:pm2`) |
 
-Adjust Strapi ports via `DEV_STRAPI_PORT` / `PROD_STRAPI_PORT` at the top of the ecosystem files. Adjust frontend ports by editing the `dev:web` / `start:web` scripts in `apps/frontend/package.json`.
+Adjust Strapi ports via `DEV_STRAPI_PORT` / `PROD_STRAPI_PORT` at the top of the ecosystem files. Adjust frontend ports by editing the `dev:web` / `dev:web:pm2` / `start:web` scripts in `apps/frontend/package.json`.
 
 Point your reverse proxy at the matching upstreams (for example `127.0.0.1:1337` for the API and `127.0.0.1:3001` for the public site).
 
@@ -130,6 +130,8 @@ pm2 restart horse-racing-strapi-dev
 pm2 restart horse-racing-frontend-dev
 pm2 stop horse-racing-strapi-dev horse-racing-frontend-dev
 ```
+
+**Metro cache on reload:** `ecosystem.dev.config.cjs` runs `dev:web:pm2` (`expo start --web -c`) so Metro’s on-disk haste map is cleared when the process starts. That avoids `Unable to deserialize cloned data` after Node or dependency upgrades (PM2 would otherwise reuse a stale V8-serialized cache). Local shell use `pnpm --dir apps/frontend dev:web` without `-c` for faster iteration.
 
 ### 5. Production (PM2)
 

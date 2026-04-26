@@ -32,7 +32,8 @@ module.exports = {
       name: 'horse-racing-frontend-dev',
       cwd: frontendDir,
       script: 'pnpm',
-      args: 'run dev:web',
+      // -c: clear Metro/Expo cache so file-map V8 blob cannot fail after Node/pnpm upgrades (pm2 reload)
+      args: 'run dev:web:pm2',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
