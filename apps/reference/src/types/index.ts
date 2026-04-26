@@ -29,6 +29,7 @@ export type RaceClass =
   | "Group 1"
   | "Group 2"
   | "Group 3"
+  | "4 Year Olds"
   | "Handicap";
 
 // ============================================================================
@@ -184,6 +185,10 @@ export interface RaceResult extends Race {
   readonly quinellaPlaceDividends?: readonly number[];
   readonly tierceDividend?: number;
   readonly trioDividend?: number;
+  /** First 4 (any order) merged pool — dividend per $10 as shown on HKJC results (FIRST 4 row). */
+  readonly first4Dividend?: number;
+  /** Quartet (四連環) — ordered 1–4; dividend as shown on HKJC local results (QUARTET row). */
+  readonly quartetDividend?: number;
 }
 
 // ============================================================================
@@ -217,6 +222,7 @@ export interface HorseAnalysis {
   readonly goingPreference: number; // -1 to 1, how much horse likes this going
   readonly distancePreference: number; // -1 to 1, how suited to this distance
   readonly ratingMomentum: number; // -1 to 1, based on handicap Rtg.+/- and position within class
+  readonly formRecordCount: number; // Number of past performances used for analysis
   readonly overallRating: number; // Composite score
 }
 

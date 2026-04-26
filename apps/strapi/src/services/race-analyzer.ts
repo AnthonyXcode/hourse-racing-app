@@ -35,6 +35,7 @@ type RaceClass =
   | 'Group 1'
   | 'Group 2'
   | 'Group 3'
+  | '4 Year Olds'
   | 'Handicap';
 
 interface SeasonStats {
@@ -177,26 +178,26 @@ function calculateFormScore(positions: number[], fieldSizes: number[] = []): num
 const PAR_TIMES: Record<Venue, Record<TrackSurface, Record<number, Record<RaceClass, number>>>> = {
   'Sha Tin': {
     Turf: {
-      1000: { 'Class 1': 55.5, 'Class 2': 56.0, 'Class 3': 56.5, 'Class 4': 57.2, 'Class 5': 58.0, Griffin: 58.5, 'Group 1': 54.8, 'Group 2': 55.2, 'Group 3': 55.5, Handicap: 56.5 },
-      1200: { 'Class 1': 68.0, 'Class 2': 68.8, 'Class 3': 69.5, 'Class 4': 70.3, 'Class 5': 71.2, Griffin: 71.8, 'Group 1': 67.0, 'Group 2': 67.5, 'Group 3': 68.0, Handicap: 69.0 },
-      1400: { 'Class 1': 80.5, 'Class 2': 81.3, 'Class 3': 82.2, 'Class 4': 83.2, 'Class 5': 84.5, Griffin: 85.0, 'Group 1': 79.5, 'Group 2': 80.0, 'Group 3': 80.5, Handicap: 81.5 },
-      1600: { 'Class 1': 93.0, 'Class 2': 94.0, 'Class 3': 95.0, 'Class 4': 96.2, 'Class 5': 97.5, Griffin: 98.0, 'Group 1': 91.5, 'Group 2': 92.0, 'Group 3': 92.5, Handicap: 94.0 },
-      1800: { 'Class 1': 106.0, 'Class 2': 107.2, 'Class 3': 108.5, 'Class 4': 110.0, 'Class 5': 111.5, Griffin: 112.0, 'Group 1': 104.5, 'Group 2': 105.0, 'Group 3': 105.5, Handicap: 107.5 },
-      2000: { 'Class 1': 119.5, 'Class 2': 121.0, 'Class 3': 122.5, 'Class 4': 124.0, 'Class 5': 126.0, Griffin: 127.0, 'Group 1': 118.0, 'Group 2': 118.5, 'Group 3': 119.0, Handicap: 121.0 },
-      2400: { 'Class 1': 145.0, 'Class 2': 147.0, 'Class 3': 149.0, 'Class 4': 151.5, 'Class 5': 154.0, Griffin: 155.0, 'Group 1': 142.0, 'Group 2': 143.0, 'Group 3': 144.0, Handicap: 147.0 },
+      1000: { 'Class 1': 55.5, 'Class 2': 56.0, 'Class 3': 56.5, 'Class 4': 57.2, 'Class 5': 58.0, Griffin: 58.5, 'Group 1': 54.8, 'Group 2': 55.2, 'Group 3': 55.5, '4 Year Olds': 55.5, Handicap: 56.5 },
+      1200: { 'Class 1': 68.0, 'Class 2': 68.8, 'Class 3': 69.5, 'Class 4': 70.3, 'Class 5': 71.2, Griffin: 71.8, 'Group 1': 67.0, 'Group 2': 67.5, 'Group 3': 68.0, '4 Year Olds': 68.0, Handicap: 69.0 },
+      1400: { 'Class 1': 80.5, 'Class 2': 81.3, 'Class 3': 82.2, 'Class 4': 83.2, 'Class 5': 84.5, Griffin: 85.0, 'Group 1': 79.5, 'Group 2': 80.0, 'Group 3': 80.5, '4 Year Olds': 80.5, Handicap: 81.5 },
+      1600: { 'Class 1': 93.0, 'Class 2': 94.0, 'Class 3': 95.0, 'Class 4': 96.2, 'Class 5': 97.5, Griffin: 98.0, 'Group 1': 91.5, 'Group 2': 92.0, 'Group 3': 92.5, '4 Year Olds': 92.5, Handicap: 94.0 },
+      1800: { 'Class 1': 106.0, 'Class 2': 107.2, 'Class 3': 108.5, 'Class 4': 110.0, 'Class 5': 111.5, Griffin: 112.0, 'Group 1': 104.5, 'Group 2': 105.0, 'Group 3': 105.5, '4 Year Olds': 105.5, Handicap: 107.5 },
+      2000: { 'Class 1': 119.5, 'Class 2': 121.0, 'Class 3': 122.5, 'Class 4': 124.0, 'Class 5': 126.0, Griffin: 127.0, 'Group 1': 118.0, 'Group 2': 118.5, 'Group 3': 119.0, '4 Year Olds': 119.0, Handicap: 121.0 },
+      2400: { 'Class 1': 145.0, 'Class 2': 147.0, 'Class 3': 149.0, 'Class 4': 151.5, 'Class 5': 154.0, Griffin: 155.0, 'Group 1': 142.0, 'Group 2': 143.0, 'Group 3': 144.0, '4 Year Olds': 144.0, Handicap: 147.0 },
     },
     AWT: {
-      1200: { 'Class 1': 69.5, 'Class 2': 70.3, 'Class 3': 71.0, 'Class 4': 71.8, 'Class 5': 72.8, Griffin: 73.5, 'Group 1': 68.5, 'Group 2': 69.0, 'Group 3': 69.5, Handicap: 70.5 },
-      1650: { 'Class 1': 98.0, 'Class 2': 99.0, 'Class 3': 100.0, 'Class 4': 101.5, 'Class 5': 103.0, Griffin: 104.0, 'Group 1': 96.5, 'Group 2': 97.0, 'Group 3': 97.5, Handicap: 99.0 },
+      1200: { 'Class 1': 69.5, 'Class 2': 70.3, 'Class 3': 71.0, 'Class 4': 71.8, 'Class 5': 72.8, Griffin: 73.5, 'Group 1': 68.5, 'Group 2': 69.0, 'Group 3': 69.5, '4 Year Olds': 69.5, Handicap: 70.5 },
+      1650: { 'Class 1': 98.0, 'Class 2': 99.0, 'Class 3': 100.0, 'Class 4': 101.5, 'Class 5': 103.0, Griffin: 104.0, 'Group 1': 96.5, 'Group 2': 97.0, 'Group 3': 97.5, '4 Year Olds': 97.5, Handicap: 99.0 },
     },
   },
   'Happy Valley': {
     Turf: {
-      1000: { 'Class 1': 56.0, 'Class 2': 56.5, 'Class 3': 57.0, 'Class 4': 57.8, 'Class 5': 58.5, Griffin: 59.0, 'Group 1': 55.0, 'Group 2': 55.5, 'Group 3': 56.0, Handicap: 57.0 },
-      1200: { 'Class 1': 69.0, 'Class 2': 69.8, 'Class 3': 70.5, 'Class 4': 71.3, 'Class 5': 72.2, Griffin: 72.8, 'Group 1': 68.0, 'Group 2': 68.5, 'Group 3': 69.0, Handicap: 70.0 },
-      1650: { 'Class 1': 98.5, 'Class 2': 99.5, 'Class 3': 100.5, 'Class 4': 101.8, 'Class 5': 103.0, Griffin: 104.0, 'Group 1': 97.0, 'Group 2': 97.5, 'Group 3': 98.0, Handicap: 99.5 },
-      1800: { 'Class 1': 107.5, 'Class 2': 108.8, 'Class 3': 110.0, 'Class 4': 111.5, 'Class 5': 113.0, Griffin: 114.0, 'Group 1': 106.0, 'Group 2': 106.5, 'Group 3': 107.0, Handicap: 109.0 },
-      2200: { 'Class 1': 133.0, 'Class 2': 134.5, 'Class 3': 136.0, 'Class 4': 138.0, 'Class 5': 140.0, Griffin: 141.5, 'Group 1': 131.0, 'Group 2': 131.5, 'Group 3': 132.0, Handicap: 134.5 },
+      1000: { 'Class 1': 56.0, 'Class 2': 56.5, 'Class 3': 57.0, 'Class 4': 57.8, 'Class 5': 58.5, Griffin: 59.0, 'Group 1': 55.0, 'Group 2': 55.5, 'Group 3': 56.0, '4 Year Olds': 56.0, Handicap: 57.0 },
+      1200: { 'Class 1': 69.0, 'Class 2': 69.8, 'Class 3': 70.5, 'Class 4': 71.3, 'Class 5': 72.2, Griffin: 72.8, 'Group 1': 68.0, 'Group 2': 68.5, 'Group 3': 69.0, '4 Year Olds': 69.0, Handicap: 70.0 },
+      1650: { 'Class 1': 98.5, 'Class 2': 99.5, 'Class 3': 100.5, 'Class 4': 101.8, 'Class 5': 103.0, Griffin: 104.0, 'Group 1': 97.0, 'Group 2': 97.5, 'Group 3': 98.0, '4 Year Olds': 98.0, Handicap: 99.5 },
+      1800: { 'Class 1': 107.5, 'Class 2': 108.8, 'Class 3': 110.0, 'Class 4': 111.5, 'Class 5': 113.0, Griffin: 114.0, 'Group 1': 106.0, 'Group 2': 106.5, 'Group 3': 107.0, '4 Year Olds': 107.0, Handicap: 109.0 },
+      2200: { 'Class 1': 133.0, 'Class 2': 134.5, 'Class 3': 136.0, 'Class 4': 138.0, 'Class 5': 140.0, Griffin: 141.5, 'Group 1': 131.0, 'Group 2': 131.5, 'Group 3': 132.0, '4 Year Olds': 132.0, Handicap: 134.5 },
     },
     AWT: {},
   },
@@ -303,7 +304,7 @@ const DRAW_BIAS: Record<Venue, Record<TrackSurface, DrawBiasData>> = {
 };
 
 const CLASS_RATINGS: Record<RaceClass, number> = {
-  'Group 1': 120, 'Group 2': 115, 'Group 3': 110,
+  'Group 1': 120, 'Group 2': 115, 'Group 3': 110, '4 Year Olds': 110,
   'Class 1': 100, 'Class 2': 90, 'Class 3': 80, 'Class 4': 70, 'Class 5': 60,
   Griffin: 55, Handicap: 85,
 };
@@ -583,7 +584,7 @@ const VALID_GOING = new Set<string>([
 const VALID_SURFACE = new Set<string>(['Turf', 'AWT']);
 const VALID_CLASS = new Set<string>([
   'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
-  'Griffin', 'Group 1', 'Group 2', 'Group 3', 'Handicap',
+  'Griffin', 'Group 1', 'Group 2', 'Group 3', '4 Year Olds', 'Handicap',
 ]);
 
 function coerceGoing(v: unknown): Going { return VALID_GOING.has(v as string) ? (v as Going) : 'Good'; }

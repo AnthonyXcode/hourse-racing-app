@@ -208,6 +208,7 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
         number
       >;
     finishOrder: Schema.Attribute.Component<'history.finish-placing', true>;
+    first4Dividend: Schema.Attribute.Decimal;
     going: Schema.Attribute.Enumeration<
       [
         'Firm',
@@ -223,6 +224,7 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
     >;
     placeDividends: Schema.Attribute.Component<'history.dividend-amount', true>;
     prizeMoney: Schema.Attribute.BigInteger;
+    quartetDividend: Schema.Attribute.Decimal;
     quinellaDividend: Schema.Attribute.Decimal;
     quinellaPlaceDividends: Schema.Attribute.Component<
       'history.dividend-amount',
@@ -243,8 +245,6 @@ export interface HistoryRaceResult extends Struct.ComponentSchema {
     surface: Schema.Attribute.Enumeration<['Turf', 'AWT']>;
     tierceDividend: Schema.Attribute.Decimal;
     trioDividend: Schema.Attribute.Decimal;
-    first4Dividend: Schema.Attribute.Decimal;
-    quartetDividend: Schema.Attribute.Decimal;
     venue: Schema.Attribute.Enumeration<['ST', 'HV']> &
       Schema.Attribute.Required;
     winDividend: Schema.Attribute.Decimal;
