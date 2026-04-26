@@ -46,11 +46,20 @@ interface SeasonStats {
   placeRate: number;
 }
 
+/** Jockey course/distance slice — for blending with season edge (formAnalysis). */
+interface JockeyCourseStats {
+  venue: Venue;
+  surface?: TrackSurface;
+  distance?: number;
+  rides: number;
+  winRate: number;
+}
+
 interface Jockey {
   code: string;
   name: string;
   seasonStats: SeasonStats;
-  courseStats: never[];
+  courseStats: JockeyCourseStats[];
 }
 
 interface Trainer {
@@ -126,6 +135,8 @@ interface HorseAnalysis {
   goingPreference: number;
   distancePreference: number;
   ratingMomentum: number;
+  /** For confidence weighting in overall rating (formAnalysis: discount when < 4) */
+  formRecordCount: number;
   overallRating: number;
 }
 
@@ -326,47 +337,75 @@ function analyzeHorse(horse: Horse, race: Race, entry: RaceEntry): HorseAnalysis
     classIndicator: computeClassIndicator(horse, race.class),
     daysSinceLastRace: computeDaysSinceLastRace(horse, race.date),
     drawAdvantage: computeDrawAdvantage(entry.draw, race.venue, race.surface, race.distance),
-    jockeyEdge: computeJockeyEdge(entry.jockey),
+    jockeyEdge: computeJockeyEdge(entry.jockey, race),
     trainerForm: computeTrainerForm(entry.trainer),
     surfacePreference: computeSurfacePreference(horse, race.surface),
     goingPreference: computeGoingPreference(horse, race.going),
     distancePreference: computeDistancePreference(horse, race.distance),
     ratingMomentum: computeRatingMomentum(horse),
+    formRecordCount: horse.pastPerformances.length,
     overallRating: 0,
   };
 }
 
-function computeOverallRating(a: HorseAnalysis): number {
-  const w = {
-    speedRating: 0.35, 
-    formScore: 0.13, 
-    classIndicator: 0.06,
-    ratingMomentum: 0.06, 
-    fitness: 0.10, 
-    drawAdvantage: 0.08,
-    jockeyEdge: 0.08, 
-    trainerForm: 0.05, 
-    surfacePreference: 0.03,
-    goingPreference: 0.03, 
-    distancePreference: 0.03,
-  };
-  const normalizedSpeed = (a.averageSpeedRating - 60) / 60;
+/**
+ * Composite overall rating — venues weight factors differently
+ * (apps/reference/src/analysis/formAnalysis.ts `calculateOverallRating`).
+ */
+function computeOverallRating(a: HorseAnalysis, venue: Venue): number {
+  const weights =
+    venue === 'Sha Tin'
+      ? {
+          speedRating: 0.18,
+          formScore: 0.14,
+          classIndicator: 0.1,
+          ratingMomentum: 0.13,
+          fitness: 0.1,
+          drawAdvantage: 0.07,
+          jockeyEdge: 0.13,
+          trainerForm: 0.07,
+          surfacePreference: 0.03,
+          goingPreference: 0.03,
+          distancePreference: 0.02,
+        }
+      : {
+          speedRating: 0.35,
+          formScore: 0.13,
+          classIndicator: 0.06,
+          ratingMomentum: 0.06,
+          fitness: 0.1,
+          drawAdvantage: 0.08,
+          jockeyEdge: 0.08,
+          trainerForm: 0.05,
+          surfacePreference: 0.03,
+          goingPreference: 0.03,
+          distancePreference: 0.03,
+        };
+
+  const normalizedSpeed = Math.max(0, Math.min(1, (a.averageSpeedRating - 60) / 60));
   const fitnessScore = computeFitnessScore(a.daysSinceLastRace);
   const normalizedClass = (a.classIndicator + 5) / 10;
   const normalizedMomentum = (a.ratingMomentum + 1) / 2;
 
-  const rating =
-    normalizedSpeed * w.speedRating +
-    a.formScore * w.formScore +
-    normalizedClass * w.classIndicator +
-    normalizedMomentum * w.ratingMomentum +
-    fitnessScore * w.fitness +
-    (a.drawAdvantage + 0.1) * 5 * w.drawAdvantage +
-    (a.jockeyEdge + 0.1) * 5 * w.jockeyEdge +
-    a.trainerForm * w.trainerForm +
-    ((a.surfacePreference + 1) / 2) * w.surfacePreference +
-    ((a.goingPreference + 1) / 2) * w.goingPreference +
-    ((a.distancePreference + 1) / 2) * w.distancePreference;
+  let rating =
+    normalizedSpeed * weights.speedRating +
+    a.formScore * weights.formScore +
+    normalizedClass * weights.classIndicator +
+    normalizedMomentum * weights.ratingMomentum +
+    fitnessScore * weights.fitness +
+    (a.drawAdvantage + 0.1) * 5 * weights.drawAdvantage +
+    (a.jockeyEdge + 0.1) * 5 * weights.jockeyEdge +
+    a.trainerForm * weights.trainerForm +
+    ((a.surfacePreference + 1) / 2) * weights.surfacePreference +
+    ((a.goingPreference + 1) / 2) * weights.goingPreference +
+    ((a.distancePreference + 1) / 2) * weights.distancePreference;
+
+  const MIN_CONFIDENT_RECORDS = 4;
+  if (a.formRecordCount < MIN_CONFIDENT_RECORDS) {
+    const confidence = a.formRecordCount / MIN_CONFIDENT_RECORDS;
+    const neutral = 0.5;
+    rating = neutral + (rating - neutral) * confidence;
+  }
 
   return Math.round(rating * 100);
 }
@@ -380,11 +419,15 @@ function computeFormScore(horse: Horse): number {
   );
 }
 
+function classRatingFor(rc: RaceClass): number {
+  return CLASS_RATINGS[rc] ?? 70;
+}
+
 function computeClassIndicator(horse: Horse, targetClass: RaceClass): number {
-  const target = CLASS_RATINGS[targetClass];
+  const target = classRatingFor(targetClass);
   if (horse.currentRating > 0 && horse.pastPerformances.length > 0) {
     const recent = horse.pastPerformances.slice(0, 3);
-    const avg = recent.reduce((s, p) => s + (CLASS_RATINGS[p.raceClass] ?? 70), 0) / recent.length;
+    const avg = recent.reduce((s, p) => s + classRatingFor(p.raceClass), 0) / recent.length;
     const classComp = (avg - target) / 10;
     const classMid = target - 5;
     const ratingAdv = (classMid - horse.currentRating) / 20;
@@ -392,7 +435,7 @@ function computeClassIndicator(horse: Horse, targetClass: RaceClass): number {
   }
   if (horse.pastPerformances.length === 0) return 0;
   const recent = horse.pastPerformances.slice(0, 3);
-  const avg = recent.reduce((s, p) => s + (CLASS_RATINGS[p.raceClass] ?? 70), 0) / recent.length;
+  const avg = recent.reduce((s, p) => s + classRatingFor(p.raceClass), 0) / recent.length;
   return (avg - target) / 10;
 }
 
@@ -428,9 +471,32 @@ function computeDrawAdvantage(draw: number, venue: Venue, surface: TrackSurface,
   return surfaceBias[closest]?.[draw] ?? 0;
 }
 
-function computeJockeyEdge(jockey: Jockey): number {
+/**
+ * Jockey edge — optional course/distance blend; HV uses sqrt compression (formAnalysis).
+ */
+function computeJockeyEdge(jockey: Jockey, race: Race): number {
   const baseWinRate = 0.08;
-  const edge = jockey.seasonStats.winRate - baseWinRate;
+  const jockeyWinRate = jockey.seasonStats.winRate;
+  let edge = jockeyWinRate - baseWinRate;
+
+  const courseStats = jockey.courseStats.find(
+    (cs) =>
+      cs.venue === race.venue &&
+      (!cs.surface || cs.surface === race.surface) &&
+      (!cs.distance || Math.abs(cs.distance - race.distance) <= 200)
+  );
+  if (courseStats && courseStats.rides >= 10) {
+    edge = edge * 0.5 + (courseStats.winRate - baseWinRate) * 0.5;
+  }
+
+  if (race.venue === 'Happy Valley') {
+    const clamped = Math.max(-0.1, Math.min(0.15, edge));
+    if (clamped > 0) {
+      return Math.sqrt(clamped / 0.15) * 0.1;
+    }
+    return clamped;
+  }
+
   return Math.max(-0.1, Math.min(0.15, edge));
 }
 
@@ -488,7 +554,7 @@ function formAnalyzeRace(race: Race): HorseAnalysis[] {
   for (const entry of race.entries) {
     if (entry.isScratched) continue;
     const a = analyzeHorse(entry.horse, race, entry);
-    analyses.push({ ...a, overallRating: computeOverallRating(a) });
+    analyses.push({ ...a, overallRating: computeOverallRating(a, race.venue) });
   }
   return analyses.sort((a, b) => b.overallRating - a.overallRating);
 }

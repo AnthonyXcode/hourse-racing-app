@@ -928,6 +928,8 @@ export class HistoricalScraper {
 
       if (!hasJockeyLink) return;
       if (!horseName || horseName.length < 2) return;
+      if (!jockeyName || jockeyName.length < 2) return;
+      if (!trainerName || trainerName.length < 2) return;
 
       // --- Weight: 3-digit number 100-140 ---
       let weight: number | undefined;
@@ -939,11 +941,19 @@ export class HistoricalScraper {
         }
       }
 
-      // --- Draw: 1-2 digit number in a column that is NOT the horse number column (index 0) ---
+      // --- Draw ("Dr.") — HKJC English cards: scan from col 4+ first (reference raceCard.parseEntryRow) ---
       let draw: number | undefined;
-      for (let i = 1; i < Math.min(cellTexts.length, 8); i++) {
+      const minDrawCol = 4;
+      for (let i = minDrawCol; i < cellTexts.length; i++) {
         const t = cellTexts[i]!.trim();
-        if (/^\d{1,2}$/.test(t)) {
+        if (!/^\d{1,2}$/.test(t)) continue;
+        const d = parseInt(t, 10);
+        if (d >= 1 && d <= 14) { draw = d; break; }
+      }
+      if (draw === undefined) {
+        for (let i = 1; i < minDrawCol && i < cellTexts.length; i++) {
+          const t = cellTexts[i]!.trim();
+          if (!/^\d{1,2}$/.test(t)) continue;
           const d = parseInt(t, 10);
           if (d >= 1 && d <= 14) { draw = d; break; }
         }
@@ -1245,13 +1255,22 @@ export class HistoricalScraper {
 
     for (const param of paramNames) {
       const url = `${base}/en-us/local/information/racecard?${param}=${datePath}&Racecourse=${venueCode}&RaceNo=${raceNumber}`;
-      const html = await this.fetchPage(url);
+      let html: string;
+      let pwMeta: { class?: string; distance?: number; surface?: string; going?: string } | null = null;
+      try {
+        await this.navigateTo(url);
+        if (!this.page) continue;
+        pwMeta = await this.extractRacecardMetaPlaywright(raceNumber);
+        html = await this.page.content();
+      } catch {
+        continue;
+      }
       const $ = cheerio.load(html);
       const bodyText = $('body').text();
       if (/No information/i.test(bodyText) && $('table td').length < 3) {
         continue;
       }
-      const info = this.parseRacecardRaceInfo($);
+      const info = this.parseRaceInfoForRacecardPage($, raceNumber, pwMeta);
       const runners = this.parseRacecardRunners($);
       const dateStr = format(date, 'yyyy-MM-dd');
       const meta: ScrapedRaceMetadata = {
@@ -1376,8 +1395,91 @@ export class HistoricalScraper {
     }
   }
 
-  /** Lenient race header parse for racecard HTML (reference raceCard.parseRaceInfo). */
-  private parseRacecardRaceInfo($: cheerio.CheerioAPI): {
+  /**
+   * Use Playwright to read class/distance/surface/going for the current race from the
+   * loaded race card DOM (reference `raceCard.extractRaceMetaViaPlaywright`).
+   */
+  private async extractRacecardMetaPlaywright(
+    raceNumber: number
+  ): Promise<{ class?: string; distance?: number; surface?: string; going?: string } | null> {
+    if (!this.page) return null;
+    try {
+      return await this.page.evaluate((raceNum: number) => {
+        // Runs in the browser; use globalThis to avoid TypeScript `document` in Node lib
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doc = (globalThis as any).document;
+        const result: { class?: string; distance?: number; surface?: string; going?: string } = {};
+        const headerSelectors = [
+          '.race_detail',
+          '.raceDetail',
+          '.race-detail',
+          '.race_head_info',
+          '.racecard-header',
+          '[class*="raceInfo"]',
+          '[class*="race_info"]',
+          '[class*="raceDetail"]',
+        ];
+        let headerText = '';
+        for (const sel of headerSelectors) {
+          const el = doc?.querySelector?.(sel) ?? null;
+          if (el && el.textContent && el.textContent.length > 10) {
+            headerText = el.textContent;
+            break;
+          }
+        }
+        if (!headerText) {
+          const allEls = doc?.querySelectorAll?.('td, div, span, p') ?? [];
+          for (const el of allEls) {
+            const t = el.textContent ?? '';
+            const racePattern = new RegExp(`Race\\s*${raceNum}\\b`, 'i');
+            if (racePattern.test(t) && /\d{3,4}\s*M/i.test(t) && t.length < 500) {
+              headerText = t;
+              break;
+            }
+          }
+        }
+        if (!headerText) {
+          const activeTab = doc?.querySelector?.(
+            '.active [class*="race"], .selected [class*="race"], [class*="race"].active'
+          ) ?? null;
+          if (activeTab?.textContent && activeTab.textContent.length > 5) {
+            headerText = activeTab.textContent;
+          }
+        }
+        if (!headerText) return result;
+        const classDistMatch = headerText.match(
+          /(4\s*(?:Year|Yr)\s*Olds?|Griffin|Group\s*(?:\d|One|Two|Three)|Class\s*\d)\s*(?:Race\s*)?[-–—]?\s*(\d{3,4})\s*M/i
+        );
+        if (classDistMatch) {
+          result.class = classDistMatch[1]!;
+          result.distance = parseInt(classDistMatch[2]!, 10);
+        } else {
+          const distOnly = headerText.match(/(\d{3,4})\s*M(?:etres?)?/i);
+          if (distOnly) {
+            const d = parseInt(distOnly[1]!, 10);
+            if (d >= 1000 && d <= 2400) result.distance = d;
+          }
+        }
+        if (/AWT|All Weather/i.test(headerText)) result.surface = 'AWT';
+        else if (/Turf/i.test(headerText)) result.surface = 'Turf';
+        const goingMatch = headerText.match(/Going\s*:\s*(\w+(?:\s+to\s+\w+)?)/i);
+        if (goingMatch) result.going = goingMatch[1]!;
+        return result;
+      }, raceNumber);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Parse race card header: race-number-anchored class/distance, header candidates, Playwright overlay.
+   * Ported from `apps/reference/src/scrapers/raceCard.ts` `parseRaceInfo` + `parseRaceCard` merge.
+   */
+  private parseRaceInfoForRacecardPage(
+    $: cheerio.CheerioAPI,
+    raceNumber: number,
+    pwMeta?: { class?: string; distance?: number; surface?: string; going?: string } | null
+  ): {
     name?: string;
     class: RaceClass;
     distance: number;
@@ -1385,34 +1487,82 @@ export class HistoricalScraper {
     going: Going;
     prizeMoney: number;
   } {
+    const raceHeaderCandidates = [
+      $('.race_head, .raceHead, .race-head, .race-info, .raceInfo').text(),
+      $('.race_detail, .raceDetail, .race-detail, .race_head_info, .racecard-header').text(),
+      $('table').first().text(),
+      $('table td')
+        .map((_, el) => $(el).text())
+        .get()
+        .join(' '),
+    ];
+    const raceHeaderText = raceHeaderCandidates.join(' ');
+
     const pageText = $('body').text();
-    const raceInfoCells = $('table td')
-      .map((_, el) => $(el).text())
-      .get()
-      .join(' ');
-    const allText = `${pageText} ${raceInfoCells}`;
+    const allText = raceHeaderText.length > 50 ? raceHeaderText : pageText;
+
+    const CLASS_PAT = '(4\\s*(?:Year|Yr)\\s*Olds?|Griffin|Group\\s*(?:\\d|One|Two|Three)|Class\\s*\\d)';
+    const DIST_PAT = '(\\d{3,4})\\s*M';
 
     let raceClass: RaceClass = 'Class 4';
-    const classMatch = allText.match(/Class\s*(\d)/i);
-    if (classMatch) {
-      raceClass = `Class ${classMatch[1]}`;
-    } else if (/Group\s*1/i.test(allText)) {
-      raceClass = 'Group 1';
-    } else if (/Group\s*2/i.test(allText)) {
-      raceClass = 'Group 2';
-    } else if (/Group\s*3/i.test(allText)) {
-      raceClass = 'Group 3';
-    } else if (/Griffin/i.test(allText)) {
-      raceClass = 'Griffin';
+    let distance = 1200;
+    let matched = false;
+
+    if (raceNumber) {
+      const anchoredRe = new RegExp(
+        `Race\\s*${raceNumber}\\b[^]*?${CLASS_PAT}\\s*(?:Race\\s*)?[-–—]?\\s*${DIST_PAT}\\s*M`,
+        'i'
+      );
+      const anchoredMatch = allText.match(anchoredRe);
+      if (anchoredMatch) {
+        raceClass = this.parseClassString(anchoredMatch[1]!);
+        distance = parseInt(anchoredMatch[2]!, 10);
+        matched = true;
+      } else {
+        const anchoredDistRe = new RegExp(
+          `Race\\s*${raceNumber}\\b[\\s\\S]{0,300}?${CLASS_PAT}[\\s\\S]{0,50}?${DIST_PAT}`,
+          'i'
+        );
+        const m2 = allText.match(anchoredDistRe);
+        if (m2) {
+          raceClass = this.parseClassString(m2[1]!);
+          distance = parseInt(m2[2]!, 10);
+          matched = true;
+        }
+      }
     }
 
-    let distance = 1200;
-    const distanceMatch =
-      allText.match(/(?:^|[^\d])(\d{4})\s*M(?:\s|$|-)/i) || allText.match(/(\d{4})\s*M[^0-9]/i);
-    if (distanceMatch) {
-      const d = parseInt(distanceMatch[1]!, 10);
-      if (d >= 1000 && d <= 2400) {
-        distance = d;
+    if (!matched) {
+      const combinedMatch = allText.match(
+        new RegExp(`${CLASS_PAT}\\s*(?:Race\\s*)?[-–—]?\\s*${DIST_PAT}\\s*M`, 'i')
+      );
+      if (combinedMatch) {
+        raceClass = this.parseClassString(combinedMatch[1]!);
+        distance = parseInt(combinedMatch[2]!, 10);
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      const classMatch = allText.match(/Class\s*(\d)/i);
+      const groupMatch =
+        allText.match(/Group\s*(\d)/i) || allText.match(/Group\s*(One|Two|Three)/i);
+      if (/4\s*(?:Year|Yr)\s*Olds?/i.test(allText)) {
+        raceClass = '4 Year Olds';
+      } else if (/Griffin/i.test(allText)) {
+        raceClass = 'Griffin';
+      } else if (classMatch) {
+        raceClass = `Class ${classMatch[1]}`;
+      } else if (groupMatch) {
+        raceClass = `Group ${this.groupWordToNumber(groupMatch[1]!)}` as RaceClass;
+      }
+      const distanceMatch =
+        allText.match(/(?:^|[^\d])(\d{4})\s*M(?:\s|$|-)/i) || allText.match(/(\d{4})\s*M[^0-9]/i);
+      if (distanceMatch) {
+        const d = parseInt(distanceMatch[1]!, 10);
+        if (d >= 1000 && d <= 2400) {
+          distance = d;
+        }
       }
     }
 
@@ -1452,7 +1602,7 @@ export class HistoricalScraper {
       name = nameMatch[1]?.trim();
     }
 
-    return {
+    const raceInfo = {
       name,
       class: raceClass,
       distance,
@@ -1460,6 +1610,20 @@ export class HistoricalScraper {
       going,
       prizeMoney,
     };
+
+    if (pwMeta) {
+      if (pwMeta.distance && pwMeta.distance >= 1000 && pwMeta.distance <= 2400) {
+        raceInfo.distance = pwMeta.distance;
+      }
+      if (pwMeta.class) {
+        raceInfo.class = this.parseClassString(pwMeta.class);
+      }
+      if (pwMeta.surface) {
+        raceInfo.surface = pwMeta.surface.includes('AWT') ? 'AWT' : 'Turf';
+      }
+    }
+
+    return raceInfo;
   }
 
   private normalizeGoing(goingText: string): Going {
