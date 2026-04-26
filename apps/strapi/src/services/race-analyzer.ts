@@ -6,7 +6,7 @@
  * + pastPerformances JSON) — no external scraping required.
  */
 
-import { differenceInDays, parse as dateParse } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 
 // ============================================================================
 // LIGHTWEIGHT TYPES (mirrors reference app — only the fields we need)
@@ -675,26 +675,40 @@ function instantToHkYmd(ms: number): string | null {
   return `${y}-${mo}-${d}`;
 }
 
+/**
+ * One HK racing calendar day as UTC 00:00:00.000Z (not local midnight).
+ * `date-fns` parse(yyyy-MM-dd) uses local TZ; on Asia/Hong_Kong that becomes
+ * 2026-03-20T16:00:00.000Z for "2026-03-21", which breaks diffs and logging.
+ */
+function hkYmdToUtcDate(ymd: string): Date {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return new Date(NaN);
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  return new Date(Date.UTC(y, mo - 1, d));
+}
+
 /** Stored pastPerformance `date`: plain yyyy-MM-dd, or legacy ISO (interpret as HK calendar day). */
 function parsePastPerformanceStoredDate(v: unknown): Date {
   if (typeof v === 'string') {
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-      return dateParse(v, 'yyyy-MM-dd', new Date());
+      return hkYmdToUtcDate(v);
     }
     const ms = Date.parse(v);
     if (!Number.isNaN(ms)) {
       const ymd = instantToHkYmd(ms);
-      if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+      if (ymd) return hkYmdToUtcDate(ymd);
     }
-    return dateParse(v.slice(0, 10), 'yyyy-MM-dd', new Date());
+    if (/^\d{4}-\d{2}-\d{2}/.test(v)) return hkYmdToUtcDate(v.slice(0, 10));
   }
   if (typeof v === 'number' && Number.isFinite(v)) {
     const ymd = instantToHkYmd(v);
-    if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+    if (ymd) return hkYmdToUtcDate(ymd);
   }
   if (v instanceof Date && !Number.isNaN(v.getTime())) {
     const ymd = instantToHkYmd(v.getTime());
-    if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+    if (ymd) return hkYmdToUtcDate(ymd);
   }
   return new Date(NaN);
 }
@@ -761,9 +775,10 @@ function buildTrainer(trainerRec: any): Trainer {
 
 function buildRaceFromMeeting(meeting: any): Race {
   const venue = VENUE_MAP[meeting.venue] ?? 'Sha Tin';
-  const raceDate = typeof meeting.raceDate === 'string'
-    ? dateParse(meeting.raceDate.slice(0, 10), 'yyyy-MM-dd', new Date())
-    : new Date(meeting.raceDate);
+  const raceDate =
+    typeof meeting.raceDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(meeting.raceDate)
+      ? hkYmdToUtcDate(meeting.raceDate.slice(0, 10))
+      : new Date(meeting.raceDate);
 
   const entries: RaceEntry[] = (meeting.runners ?? []).map((r: any) => {
     const pastPerfs = parsePastPerformances(r.pastPerformances);
