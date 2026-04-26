@@ -657,14 +657,55 @@ function coerceGoing(v: unknown): Going { return VALID_GOING.has(v as string) ? 
 function coerceSurface(v: unknown): TrackSurface { return VALID_SURFACE.has(v as string) ? (v as TrackSurface) : 'Turf'; }
 function coerceClass(v: unknown): RaceClass { return VALID_CLASS.has(v as string) ? (v as RaceClass) : 'Class 4'; }
 
+/** HK racing calendar day for an instant (matches history / stored ymd semantics). */
+const HK_YMD_DTF = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Hong_Kong',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function instantToHkYmd(ms: number): string | null {
+  if (!Number.isFinite(ms)) return null;
+  const parts = HK_YMD_DTF.formatToParts(new Date(ms));
+  const y = parts.find((x) => x.type === 'year')?.value;
+  const mo = parts.find((x) => x.type === 'month')?.value;
+  const d = parts.find((x) => x.type === 'day')?.value;
+  if (!y || !mo || !d) return null;
+  return `${y}-${mo}-${d}`;
+}
+
+/** Stored pastPerformance `date`: plain yyyy-MM-dd, or legacy ISO (interpret as HK calendar day). */
+function parsePastPerformanceStoredDate(v: unknown): Date {
+  if (typeof v === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      return dateParse(v, 'yyyy-MM-dd', new Date());
+    }
+    const ms = Date.parse(v);
+    if (!Number.isNaN(ms)) {
+      const ymd = instantToHkYmd(ms);
+      if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+    }
+    return dateParse(v.slice(0, 10), 'yyyy-MM-dd', new Date());
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const ymd = instantToHkYmd(v);
+    if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+  }
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    const ymd = instantToHkYmd(v.getTime());
+    if (ymd) return dateParse(ymd, 'yyyy-MM-dd', new Date());
+  }
+  return new Date(NaN);
+}
+
 function parsePastPerformances(json: string | null | undefined): PastPerformance[] {
   if (!json) return [];
   let arr: any[];
   try { arr = JSON.parse(json); } catch { return []; }
   if (!Array.isArray(arr)) return [];
   return arr.map((p: any) => ({
-    // TODO: the date is one day before the actual date, need to fix this
-    date: typeof p.date === 'string' ? dateParse(p.date.slice(0, 10), 'yyyy-MM-dd', new Date()) : new Date(p.date),
+    date: parsePastPerformanceStoredDate(p.date),
     venue: VENUE_MAP[p.venue] ?? 'Sha Tin',
     raceNumber: Number(p.raceNumber) || 1,
     raceClass: coerceClass(p.raceClass),

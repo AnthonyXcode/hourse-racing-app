@@ -468,6 +468,25 @@ function venueCodeToName(code: string | undefined): string {
   return code;
 }
 
+/**
+ * History race day is a calendar Y-M-D (same as `history-results-mapper` / admin).
+ * Do not use `new Date(ymd).toISOString()` — that invites off-by-one when consumers
+ * parse the ISO instant in a non-UTC timezone.
+ */
+function historyRaceDateToYmd(raceDate: unknown): string {
+  if (typeof raceDate === 'string') {
+    const s = raceDate.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+  }
+  if (raceDate instanceof Date && !Number.isNaN(raceDate.getTime())) {
+    const y = raceDate.getUTCFullYear();
+    const m = raceDate.getUTCMonth() + 1;
+    const d = raceDate.getUTCDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return '';
+}
+
 function buildPastPerformanceMap(
   races: HistoryRaceResult[],
   raceDate: string
@@ -475,7 +494,7 @@ function buildPastPerformanceMap(
   const map = new Map<string, PastPerformanceEntry[]>();
 
   for (const race of races) {
-    const rd = typeof race.raceDate === 'string' ? race.raceDate.slice(0, 10) : '';
+    const rd = historyRaceDateToYmd(race.raceDate);
     if (!rd || rd >= raceDate) continue;
 
     const finishOrder = race.finishOrder;
@@ -489,7 +508,7 @@ function buildPastPerformanceMap(
       if (!code) continue;
 
       const entry: PastPerformanceEntry = {
-        date: new Date(rd).toISOString(),
+        date: rd,
         venue: venueCodeToName(race.venue),
         raceNumber: race.raceNumber ?? 0,
         finishPosition: fo.finishPosition ?? 0,
