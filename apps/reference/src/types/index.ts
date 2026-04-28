@@ -72,9 +72,10 @@ export interface Trainer {
 // HORSE
 // ============================================================================
 
-export type Gear = "B" | "H" | "P" | "TT" | "V" | "XB" | "PC" | "SR" | "CP" | "E";
-// B=Blinkers, H=Hood, P=Pacifiers, TT=Tongue Tie, V=Visor
-// XB=Cross-over Noseband, PC=Cheek Pieces, SR=Shadow Roll, CP=Nose Band Cross, E=Ear Muffs
+export type Gear = "B" | "BO" | "H" | "P" | "TT" | "V" | "VO" | "XB" | "PC" | "SR" | "CP" | "CO" | "CC" | "PS" | "SB" | "E";
+// B=Blinkers, BO=Blinker one cowl, H=Hood, P=Pacifier, TT=Tongue Tie, V=Visor, VO=Visor one cowl
+// XB=Crossed Nose Band, PC=Sheepskin Cheek Pieces, SR=Shadow Roll, CP=Sheepskin Cheek Pieces
+// CO=Cheek Piece One Side, CC=Cornell Collar, PS=Pacifier one cowl, SB=Sheepskin Browband, E=Ear Plugs
 
 export interface PastPerformance {
   readonly date: Date;
@@ -187,8 +188,6 @@ export interface RaceResult extends Race {
   readonly trioDividend?: number;
   /** First 4 (any order) merged pool — dividend per $10 as shown on HKJC results (FIRST 4 row). */
   readonly first4Dividend?: number;
-  /** Quartet (四連環) — ordered 1–4; dividend as shown on HKJC local results (QUARTET row). */
-  readonly quartetDividend?: number;
 }
 
 // ============================================================================

@@ -634,7 +634,6 @@ export class HistoricalScraper {
     tierceDividend?: number;
     trioDividend?: number;
     first4Dividend?: number;
-    quartetDividend?: number;
   } {
     const dividends: {
       winDividend?: number;
@@ -644,7 +643,6 @@ export class HistoricalScraper {
       tierceDividend?: number;
       trioDividend?: number;
       first4Dividend?: number;
-      quartetDividend?: number;
     } = {};
 
     // Get all text from the page
@@ -713,11 +711,6 @@ export class HistoricalScraper {
     const f4Match = pageText.match(/FIRST\s*4\s+[\d,]+\s+([\d,.]+)/i);
     if (f4Match) {
       dividends.first4Dividend = parseFloat(f4Match[1]!.replace(/,/g, ""));
-    }
-
-    const quartetMatch = pageText.match(/QUARTET\s+[\d,]+\s+([\d,.]+)/i);
-    if (quartetMatch) {
-      dividends.quartetDividend = parseFloat(quartetMatch[1]!.replace(/,/g, ""));
     }
 
     return dividends;
