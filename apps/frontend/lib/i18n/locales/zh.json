@@ -91,6 +91,7 @@
     "win": "獨贏",
     "place": "位置",
     "expPos": "預期排名",
+    "modelRating": "模型評分",
     "class": "{{value}} 班"
   },
   "profile": {

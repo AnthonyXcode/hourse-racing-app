@@ -134,25 +134,33 @@ export default function RaceDetailScreen() {
                   </XStack>
 
                   {analysisResult ? (
-                    <XStack gap="$3" backgroundColor="$blue2" padding="$2" borderRadius="$2">
-                      <YStack alignItems="center" flex={1}>
+                    <XStack gap="$3" backgroundColor="$blue2" padding="$2" borderRadius="$2" flexWrap="wrap">
+                      <YStack alignItems="center" flex={1} minWidth={72}>
                         <Text fontWeight="bold" color="$blue11">
                           {(analysisResult.winProbability * 100).toFixed(1)}%
                         </Text>
                         <Text fontSize="$1" color="$gray11">{t('race.win')}</Text>
                       </YStack>
-                      <YStack alignItems="center" flex={1}>
+                      <YStack alignItems="center" flex={1} minWidth={72}>
                         <Text fontWeight="bold" color="$green11">
                           {(analysisResult.placeProbability * 100).toFixed(1)}%
                         </Text>
                         <Text fontSize="$1" color="$gray11">{t('race.place')}</Text>
                       </YStack>
-                      <YStack alignItems="center" flex={1}>
+                      <YStack alignItems="center" flex={1} minWidth={72}>
                         <Text fontWeight="bold" color="$gray11">
                           {analysisResult.expectedPosition?.toFixed(1)}
                         </Text>
                         <Text fontSize="$1" color="$gray11">{t('race.expPos')}</Text>
                       </YStack>
+                      {analysisResult.overallRating != null ? (
+                        <YStack alignItems="center" flex={1} minWidth={72}>
+                          <Text fontWeight="bold" color="$purple11">
+                            {Number(analysisResult.overallRating).toFixed(0)}
+                          </Text>
+                          <Text fontSize="$1" color="$gray11">{t('race.modelRating')}</Text>
+                        </YStack>
+                      ) : null}
                     </XStack>
                   ) : null}
                 </YStack>

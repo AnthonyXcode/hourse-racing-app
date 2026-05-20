@@ -91,6 +91,7 @@
     "win": "Win",
     "place": "Place",
     "expPos": "Exp. Pos",
+    "modelRating": "Model",
     "class": "Class {{value}}"
   },
   "profile": {

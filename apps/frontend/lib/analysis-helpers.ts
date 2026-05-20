@@ -12,6 +12,7 @@ export interface HorseResult {
   placeProbability: number;
   ranking: number;
   formRecordCount?: number;
+  overallRating?: number;
   winOdds?: number;
 }
 
@@ -30,6 +31,7 @@ export function toHorseResults(
       placeProbability: c.placeProbability ?? 0,
       ranking: c.ranking!,
       formRecordCount: c.formRecordCount,
+      overallRating: c.overallRating,
     }));
 }
 
