@@ -41,6 +41,7 @@ export async function runAnalysisForMeeting(
         expectedPosition: r.expectedPosition,
         ranking: r.ranking,
         formRecordCount: r.formRecordCount,
+        overallRating: r.overallRating,
       })),
       analyzedAt: new Date().toISOString(),
     },

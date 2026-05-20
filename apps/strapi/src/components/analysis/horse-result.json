@@ -46,6 +46,11 @@
       "default": 0,
       "min": 0,
       "description": "Number of past performance records used for this horse"
+    },
+    "overallRating": {
+      "type": "decimal",
+      "min": 0,
+      "description": "FormAnalyzer composite rating for this race (used as MC base performance)"
     }
   }
 }

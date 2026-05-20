@@ -32,6 +32,13 @@ export interface AnalysisHorseResult extends Struct.ComponentSchema {
         },
         number
       >;
+    overallRating: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     placeProbability: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<

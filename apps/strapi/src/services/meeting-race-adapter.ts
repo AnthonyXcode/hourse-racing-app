@@ -13,6 +13,7 @@ import {
   type Race,
   type RaceClass,
   type RaceEntry,
+  type HorseAnalysis,
   type SimulationResult,
   type TrackSurface,
   type Trainer,
@@ -28,6 +29,7 @@ export interface AnalysisResultRow {
   expectedPosition: number;
   ranking: number;
   formRecordCount: number;
+  overallRating: number;
 }
 
 const VENUE_MAP: Record<string, Venue> = { ST: 'Sha Tin', HV: 'Happy Valley' };
@@ -244,28 +246,33 @@ export function buildRaceFromMeeting(meeting: Record<string, unknown>): Race {
   };
 }
 
-function toAnalysisRows(simulationResults: SimulationResult[]): AnalysisResultRow[] {
+function toAnalysisRows(
+  simulationResults: SimulationResult[],
+  analyses: HorseAnalysis[],
+): AnalysisResultRow[] {
+  const analysisByCode = new Map(analyses.map((a) => [a.horseCode, a]));
   const sorted = [...simulationResults].sort((a, b) => b.winProbability - a.winProbability);
-  return sorted.map((r, i) => ({
-    horseNumber: r.horseNumber,
-    horseName: r.horseName,
-    horseCode: r.horseCode,
-    winProbability: r.winProbability,
-    placeProbability: r.placeProbability,
-    expectedPosition: r.expectedPosition,
-    ranking: i + 1,
-    formRecordCount: r.formRecordCount,
-  }));
+  return sorted.map((r, i) => {
+    const analysis = analysisByCode.get(r.horseCode);
+    return {
+      horseNumber: r.horseNumber,
+      horseName: r.horseName,
+      horseCode: r.horseCode,
+      winProbability: r.winProbability,
+      placeProbability: r.placeProbability,
+      expectedPosition: r.expectedPosition,
+      ranking: i + 1,
+      formRecordCount: analysis?.formRecordCount ?? r.formRecordCount,
+      overallRating: analysis?.overallRating ?? 0,
+    };
+  });
 }
 
 function runSimulation(race: Race): AnalysisResultRow[] {
-    const ANOTHERZONDA = race.entries.find(a => a.horse.name === 'ANOTHER ZONDA');
-    console.log(`${JSON.stringify(ANOTHERZONDA)}`)
   const analyses = formAnalyzer.analyzeRace(race);
-  // log entity of horse with name ANOTHER ZONDA
   const simulator = createSimulatorForRace(race);
   const { results } = simulator.simulateRaceWithAnalyses(race, analyses);
-  return toAnalysisRows(results);
+  return toAnalysisRows(results, analyses);
 }
 
 const MEETING_POPULATE = {
