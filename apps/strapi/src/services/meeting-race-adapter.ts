@@ -32,7 +32,7 @@ export interface AnalysisResultRow {
   overallRating: number;
 }
 
-const VENUE_MAP: Record<string, Venue> = { ST: 'Sha Tin', HV: 'Happy Valley' };
+const VENUE_MAP: Record<string, Venue> = { ST: 'Sha Tin', HV: 'Happy Valley', 'Happy Valley': 'Happy Valley', 'Sha Tin': 'Sha Tin' };
 
 const VALID_GOING = new Set<string>([
   'Firm', 'Good to Firm', 'Good', 'Good to Yielding', 'Yielding', 'Soft', 'Heavy', 'Wet Fast', 'Wet Slow',
@@ -269,6 +269,8 @@ function toAnalysisRows(
 }
 
 function runSimulation(race: Race): AnalysisResultRow[] {
+    const ANOTHERZONDA = race.entries.find(a => a.horse.name === 'ANOTHER ZONDA');
+    console.log(`${JSON.stringify(ANOTHERZONDA)}`)
   const analyses = formAnalyzer.analyzeRace(race);
   const simulator = createSimulatorForRace(race);
   const { results } = simulator.simulateRaceWithAnalyses(race, analyses);
