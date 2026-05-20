@@ -1,0 +1,38 @@
+{
+  "name": "@horse-racing/form-analyzer",
+  "version": "0.1.0",
+  "description": "HKJC form analysis, speed ratings, and Monte Carlo race simulation",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "clean": "rm -rf dist node_modules",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@horse-racing/config": "workspace:*",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

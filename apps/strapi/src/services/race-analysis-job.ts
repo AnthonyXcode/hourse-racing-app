@@ -6,7 +6,7 @@
  */
 
 import { format } from 'date-fns';
-import { analyzeRaceByKey } from './race-analyzer';
+import { analyzeRaceByKey } from './meeting-race-adapter';
 
 function analysisName(meetingKey: string): string {
   const now = format(new Date(), 'yyyyMMddHHmmss');
